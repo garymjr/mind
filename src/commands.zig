@@ -255,7 +255,13 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 
     // Update status
     todo_list.todos[idx].status = .done;
-    
+
+    // Update resolution reason if provided
+    if (args.reason) |reason| {
+        allocator.free(todo_list.todos[idx].resolution_reason);
+        todo_list.todos[idx].resolution_reason = try allocator.dupe(u8, reason);
+    }
+
     // Update timestamp
     allocator.free(todo_list.todos[idx].updated_at);
     todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
@@ -263,6 +269,59 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     try st.save(&todo_list);
 
     try stdout.interface.print("Marked todo as done: {s}\n", .{args.target.?});
+}
+
+pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stderr_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    defer stdout.end() catch {};
+    defer stderr.end() catch {};
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    // Build list of unblocked todos
+    var unblocked = std.ArrayListUnmanaged(*const todo.Todo){};
+    defer unblocked.deinit(allocator);
+
+    for (todo_list.todos) |*item| {
+        // Skip completed todos
+        if (item.status == .done) continue;
+
+        // Check if all dependencies are done
+        var all_deps_done = true;
+        for (item.depends_on) |dep_id| {
+            if (todo_list.findById(dep_id)) |dep| {
+                if (dep.status != .done) {
+                    all_deps_done = false;
+                    break;
+                }
+            }
+        }
+
+        if (all_deps_done) {
+            try unblocked.append(allocator, item);
+        }
+    }
+
+    if (unblocked.items.len == 0) {
+        try stdout.interface.writeAll("No unblocked todos found.\n");
+        return;
+    }
+
+    if (args.all) {
+        try stdout.interface.writeAll("Unblocked todos:\n");
+        for (unblocked.items) |item| {
+            try stdout.interface.print("  {s} {s:<12} {s}\n", .{ item.id, item.status.toString(), item.title });
+        }
+    } else {
+        const next_todo = unblocked.items[0];
+        try stdout.interface.writeAll("Next todo:\n");
+        try outputTodoDetail(&stdout, next_todo.*, &todo_list);
+    }
 }
 
 fn outputList(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
@@ -319,6 +378,10 @@ fn outputTodoDetail(writer: *std.fs.File.Writer, item: todo.Todo, todo_list: *co
 
     try w.print("\nCreated: {s}\n", .{item.created_at});
     try w.print("Updated: {s}\n", .{item.updated_at});
+
+    if (item.status == .done and item.resolution_reason.len > 0) {
+        try w.print("\nResolution: {s}\n", .{item.resolution_reason});
+    }
 }
 
 fn outputJson(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
@@ -355,7 +418,8 @@ fn outputJson(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
         try w.writeAll("],\n");
 
         try w.print("      \"created_at\": \"{s}\",\n", .{item.created_at});
-        try w.print("      \"updated_at\": \"{s}\"\n", .{item.updated_at});
+        try w.print("      \"updated_at\": \"{s}\",\n", .{item.updated_at});
+        try w.print("      \"resolution_reason\": \"{s}\"\n", .{item.resolution_reason});
         try w.writeAll("    }");
         if (i < todos.len - 1) try w.writeAll(",");
         try w.writeAll("\n");

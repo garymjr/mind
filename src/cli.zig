@@ -13,6 +13,7 @@ pub const Command = enum {
     list,
     show,
     done,
+    next,
     tag,
     untag,
     link,
@@ -29,8 +30,10 @@ pub const Args = struct {
     from: ?[]const u8 = null, // for unlink
     status: ?[]const u8 = null,
     tag_filter: ?[]const u8 = null,
+    reason: ?[]const u8 = null, // for done command
     blocked_only: bool = false,
     unblocked_only: bool = false,
+    all: bool = false,
     json: bool = false,
     force: bool = false,
 };
@@ -42,9 +45,11 @@ const FLAG_DEFINITIONS = struct {
     const TAG = "--tag";
     const BLOCKED = "--blocked";
     const UNBLOCKED = "--unblocked";
+    const ALL = "--all";
     const JSON = "--json";
     const FROM = "--from";
     const FORCE = "--force";
+    const REASON = "--reason";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -100,6 +105,14 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.REASON)) {
+            i += 1;
+            if (i >= args.len) return error.MissingValueForFlag;
+            result.reason = args[i];
+            i += 1;
+            continue;
+        }
+
         if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.BLOCKED)) {
             result.blocked_only = true;
             i += 1;
@@ -108,6 +121,12 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
 
         if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.UNBLOCKED)) {
             result.unblocked_only = true;
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.ALL)) {
+            result.all = true;
             i += 1;
             continue;
         }
@@ -159,6 +178,7 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "list")) return .list;
     if (std.mem.eql(u8, str, "show")) return .show;
     if (std.mem.eql(u8, str, "done")) return .done;
+    if (std.mem.eql(u8, str, "next")) return .next;
     if (std.mem.eql(u8, str, "tag")) return .tag;
     if (std.mem.eql(u8, str, "untag")) return .untag;
     if (std.mem.eql(u8, str, "link")) return .link;

@@ -156,6 +156,13 @@ pub const Storage = struct {
             });
             errdefer self.allocator.free(updated_at);
 
+            const resolution_value = item_obj.get("resolution_reason") orelse std.json.Value{ .string = "" };
+            const resolution_reason = try self.allocator.dupe(u8, switch (resolution_value) {
+                .string => |s| s,
+                else => "",
+            });
+            errdefer self.allocator.free(resolution_reason);
+
             const tags_slice = try tags.toOwnedSlice(self.allocator);
             const depends_slice = try depends_on.toOwnedSlice(self.allocator);
             const blocked_slice = try blocked_by.toOwnedSlice(self.allocator);
@@ -170,6 +177,7 @@ pub const Storage = struct {
                 .blocked_by = blocked_slice,
                 .created_at = created_at,
                 .updated_at = updated_at,
+                .resolution_reason = resolution_reason,
             });
         }
 
@@ -241,9 +249,12 @@ pub const Storage = struct {
             defer self.allocator.free(escaped_created);
             const escaped_updated = try escapeJsonString(self.allocator, item.updated_at);
             defer self.allocator.free(escaped_updated);
+            const escaped_resolution = try escapeJsonString(self.allocator, item.resolution_reason);
+            defer self.allocator.free(escaped_resolution);
 
             try writer.interface.print("      \"created_at\": \"{s}\",\n", .{escaped_created});
-            try writer.interface.print("      \"updated_at\": \"{s}\"\n", .{escaped_updated});
+            try writer.interface.print("      \"updated_at\": \"{s}\",\n", .{escaped_updated});
+            try writer.interface.print("      \"resolution_reason\": \"{s}\"\n", .{escaped_resolution});
             try writer.interface.writeAll("    }");
             if (i < todo_list.todos.len - 1) try writer.interface.writeAll(",");
             try writer.interface.writeAll("\n");

@@ -13,6 +13,7 @@ const HELP_TEXT: []const u8 =
     \\    list                     List all todos
     \\    show <id>                Show todo details
     \\    done <id>                Mark todo as done
+    \\    next                     Show next unblocked todo
     \\    tag <id> <tag>           Add tag to todo
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
@@ -27,6 +28,8 @@ const HELP_TEXT: []const u8 =
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
     \\    --unblocked              Show only unblocked todos
+    \\    --all                    Show all unblocked todos (for 'next')
+    \\    --reason <text>          Set resolution reason (for 'done')
     \\    --json                   Output as JSON
     \\    --help, -h               Show this help
     \\
@@ -35,7 +38,9 @@ const HELP_TEXT: []const u8 =
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind show 1234567890-001
-    \\    mind done 1234567890-001
+    \\    mind done 1234567890-001 --reason "Completed API integration"
+    \\    mind next
+    \\    mind next --all
     \\    mind link 1234567890-002 1234567890-001
     \\    mind list --json
     \\
@@ -115,12 +120,33 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Mark todo as done
                 \\
                 \\USAGE:
-                \\    mind done <id>
+                \\    mind done <id> [--reason <text>]
+                \\
+                \\FLAGS:
+                \\    --reason <text>    Optional reason for completion
                 \\
                 \\NOTE: Cannot mark blocked todos as done
                 \\
                 \\EXAMPLES:
                 \\    mind done 1736205028-001
+                \\    mind done 1736205028-001 --reason "Fixed the memory leak"
+                \\
+                \\
+            );
+        },
+        .next => {
+            try writer.interface.writeAll(
+                \\Show next unblocked todo
+                \\
+                \\USAGE:
+                \\    mind next [--all]
+                \\
+                \\FLAGS:
+                \\    --all              Show all unblocked todos
+                \\
+                \\EXAMPLES:
+                \\    mind next
+                \\    mind next --all
                 \\
                 \\
             );

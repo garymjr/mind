@@ -36,6 +36,7 @@ pub const Todo = struct {
     blocked_by: []const []const u8,
     created_at: []const u8,
     updated_at: []const u8,
+    resolution_reason: []const u8,
 };
 
 pub const TodoList = struct {
@@ -56,10 +57,13 @@ pub const TodoList = struct {
             self.allocator.free(todo.body);
             for (todo.tags) |tag| self.allocator.free(tag);
             self.allocator.free(todo.tags);
+            for (todo.depends_on) |dep| self.allocator.free(dep);
             self.allocator.free(todo.depends_on);
+            for (todo.blocked_by) |blocked| self.allocator.free(blocked);
             self.allocator.free(todo.blocked_by);
             self.allocator.free(todo.created_at);
             self.allocator.free(todo.updated_at);
+            self.allocator.free(todo.resolution_reason);
         }
         self.allocator.free(self.todos);
     }
@@ -98,6 +102,7 @@ pub const TodoList = struct {
         self.allocator.free(todo.blocked_by);
         self.allocator.free(todo.created_at);
         self.allocator.free(todo.updated_at);
+        self.allocator.free(todo.resolution_reason);
 
         // Shift remaining todos
         for (idx + 1..self.todos.len) |i| {
@@ -143,18 +148,24 @@ pub const TodoList = struct {
 
         // Update todos with their new blocked_by lists
         for (self.todos, 0..) |*todo, i| {
+            // Free existing blocked_by strings before replacing the array
+            for (todo.blocked_by) |id| self.allocator.free(id);
             self.allocator.free(todo.blocked_by);
             todo.blocked_by = try blocked_lists.items[i].toOwnedSlice(self.allocator);
-            // Free the old backing array from the ArrayList
-            if (blocked_lists.items[i].capacity > 0) {
-                self.allocator.free(blocked_lists.items[i].allocatedSlice());
-            }
             blocked_lists.items[i] = .{}; // Clear so destructor doesn't double-free
         }
     }
 
-    pub fn isBlocked(_: TodoList, todo: Todo) bool {
-        return todo.blocked_by.len > 0;
+    pub fn isBlocked(self: TodoList, todo: Todo) bool {
+        // A todo is blocked if any of its dependencies are not done
+        for (todo.depends_on) |dep_id| {
+            if (self.findById(dep_id)) |dep| {
+                if (dep.status != .done) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 };
 
@@ -207,6 +218,7 @@ pub fn createTodo(
         .blocked_by = try allocator.alloc([]const u8, 0),
         .created_at = timestamp,
         .updated_at = try allocator.dupe(u8, timestamp),
+        .resolution_reason = try allocator.dupe(u8, ""),
     };
 }
 

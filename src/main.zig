@@ -1,6 +1,7 @@
 const std = @import("std");
 const cli = @import("cli.zig");
 const commands = @import("commands.zig");
+const help = @import("cli_help.zig");
 
 const MIND_DIR = ".mind";
 const MIND_FILE = ".mind/mind.json";
@@ -48,18 +49,10 @@ pub fn main() !void {
     if (parsed.command == .help) {
         if (parsed.target) |cmd_str| {
             if (cli.parseCommand(cmd_str)) |cmd| {
-                const stderr = std.fs.File.stderr();
-                try stderr.writeAll("mind ");
-                try stderr.writeAll(@tagName(cmd));
-                try stderr.writeAll(" - ");
-                switch (cmd) {
-                    .add => try stderr.writeAll("Add a new todo\n    Usage: mind add <title> [--body <text>] [--tags <t1,t2>]\n"),
-                    .list => try stderr.writeAll("List todos\n    Usage: mind list [--status <s>] [--tag <tag>] [--blocked] [--unblocked] [--json]\n"),
-                    .show => try stderr.writeAll("Show todo details\n    Usage: mind show <id> [--json]\n"),
-                    .done => try stderr.writeAll("Mark todo as done\n    Usage: mind done <id>\n"),
-                    .delete => try stderr.writeAll("Delete a todo\n    Usage: mind delete <id> [--force]\n"),
-                    else => try stderr.writeAll("Command help not yet implemented\n"),
-                }
+                var buf: [4096]u8 = undefined;
+                var stderr_writer = std.fs.File.stderr().writer(&buf);
+                defer stderr_writer.end() catch {};
+                try help.printCommandHelp(&stderr_writer, cmd);
             } else {
                 const stderr = std.fs.File.stderr();
                 try stderr.writeAll("error: unknown command: ");
@@ -84,6 +77,7 @@ pub fn main() !void {
         .list => try commands.executeList(allocator, parsed, MIND_FILE),
         .show => try commands.executeShow(allocator, parsed, MIND_FILE),
         .done => try commands.executeDone(allocator, parsed, MIND_FILE),
+        .next => try commands.executeNext(allocator, parsed, MIND_FILE),
         .delete => try commands.executeDelete(allocator, parsed, MIND_FILE),
         .tag, .untag, .link, .unlink => {
             const stderr = std.fs.File.stderr();
@@ -109,6 +103,7 @@ const HELP_TEXT =
     \\    list                     List all todos
     \\    show <id>                Show todo details
     \\    done <id>                Mark todo as done
+    \\    next                     Show next unblocked todo
     \\    tag <id> <tag>           Add tag to todo
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
@@ -124,6 +119,8 @@ const HELP_TEXT =
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
     \\    --unblocked              Show only unblocked todos
+    \\    --all                    Show all unblocked todos (for 'next')
+    \\    --reason <text>          Set resolution reason (for 'done')
     \\    --json                   Output as JSON
     \\    --help, -h               Show this help
     \\
@@ -132,7 +129,9 @@ const HELP_TEXT =
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind show 1234567890-001
-    \\    mind done 1234567890-001
+    \\    mind done 1234567890-001 --reason "Completed API integration"
+    \\    mind next
+    \\    mind next --all
     \\    mind link 1234567890-002 1234567890-001
     \\    mind list --json
     \\
@@ -169,6 +168,12 @@ const QUICKSTART_TEXT =
     \\       $ mind done <id>
     \\       (Use 'done' when you finish a todo)
     \\
+    \\6. Find the next task to work on:
+    \\       $ mind next
+    \\       (Shows the first unblocked todo)
+    \\       $ mind next --all
+    \\       (Shows all unblocked todos)
+    \\
     \\══════════════════════════════════════════════════════════════════
     \\POWER FEATURES
     \\══════════════════════════════════════════════════════════════════
@@ -184,6 +189,8 @@ const QUICKSTART_TEXT =
     \\• Filters: See only what matters
     \\       $ mind list --status pending
     \\       $ mind list --blocked      (tasks waiting on others)
+    \\       $ mind next                (next unblocked todo)
+    \\       $ mind next --all          (all unblocked todos)
     \\
     \\══════════════════════════════════════════════════════════════════
     \\COMMON WORKFLOWS
@@ -193,8 +200,10 @@ const QUICKSTART_TEXT =
     \\   1. mind add "Design the feature" --tags "planning"
     \\   2. mind add "Implement core logic" --tags "dev"
     \\   3. mind link <implement-id> <design-id>
-    \\   4. mind done <design-id>
-    \\   5. mind done <implement-id>
+    \\   4. mind next              (see what to work on)
+    \\   5. mind done <design-id>
+    \\   6. mind next              (now implement)
+    \\   7. mind done <implement-id>
     \\
     \\Track bugs:
     \\   1. mind add "Fix login crash" --tags "bug,critical"
