@@ -167,6 +167,7 @@ const QUICKSTART_TEXT =
     \\
     \\5. Mark a todo as done:
     \\       $ mind done <id>
+    \\       (Use 'done' when you finish a todo)
     \\
     \\══════════════════════════════════════════════════════════════════
     \\POWER FEATURES
