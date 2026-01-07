@@ -70,13 +70,54 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var todo_list = try st.load();
     defer todo_list.deinit();
 
-    // Apply filters - for now, no filtering
-    const todos_to_show = todo_list.todos;
+    // Build filtered list
+    var filtered = std.ArrayListUnmanaged(*const todo.Todo){};
+    defer filtered.deinit(allocator);
+
+    for (todo_list.todos) |*item| {
+        // Apply tag filter
+        if (args.tag_filter) |filter_tag| {
+            var has_tag = false;
+            for (item.tags) |tag| {
+                if (std.mem.eql(u8, tag, filter_tag)) {
+                    has_tag = true;
+                    break;
+                }
+            }
+            if (!has_tag) continue;
+        }
+
+        try filtered.append(allocator, item);
+    }
+
+    // Convert to slice for output functions
+    var todos_slice = try allocator.alloc(*const todo.Todo, filtered.items.len);
+    defer allocator.free(todos_slice);
+    for (filtered.items, 0..) |item, i| {
+        todos_slice[i] = item;
+    }
 
     if (args.json) {
-        try outputJson(&stdout, todos_to_show);
+        // Convert back to Todo[] for JSON output
+        var todos_for_json = try allocator.alloc(todo.Todo, filtered.items.len);
+        defer {
+            for (todos_for_json) |_| {
+                // Don't free - these are borrowed from todo_list
+            }
+            allocator.free(todos_for_json);
+        }
+        for (filtered.items, 0..) |item, i| {
+            todos_for_json[i] = item.*;
+        }
+        try outputJson(&stdout, todos_for_json);
     } else {
-        try outputList(&stdout, todos_to_show);
+        // Dereference pointers for outputList
+        var todos_output = try allocator.alloc(todo.Todo, filtered.items.len);
+        defer allocator.free(todos_output);
+        for (filtered.items, 0..) |item, i| {
+            todos_output[i] = item.*;
+        }
+        try outputList(&stdout, todos_output);
     }
 
     // Flush the buffer
