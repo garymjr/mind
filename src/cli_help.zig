@@ -171,6 +171,42 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
             );
         },
+        .link => {
+            try writer.interface.writeAll(
+                \\Link todos (create dependency)
+                \\
+                \\USAGE:
+                \\    mind link <child-id> <parent-id>
+                \\
+                \\The child todo will depend on the parent. The child cannot be marked done
+                \\until the parent is done.
+                \\
+                \\A todo can depend on multiple parents.
+                \\
+                \\EXAMPLES:
+                \\    mind link 1736205028-002 1736205028-001
+                \\    # Todo 002 now depends on 001
+                \\
+                \\
+            );
+        },
+        .unlink => {
+            try writer.interface.writeAll(
+                \\Remove dependency link between todos
+                \\
+                \\USAGE:
+                \\    mind unlink <child-id> --from <parent-id>
+                \\
+                \\FLAGS:
+                \\    --from <parent-id>  Parent todo to unlink from
+                \\
+                \\EXAMPLES:
+                \\    mind unlink 1736205028-002 --from 1736205028-001
+                \\    # Todo 002 no longer depends on 001
+                \\
+                \\
+            );
+        },
         else => {
             try writer.interface.writeAll("Command help not yet implemented. Use 'mind --help' for overview.\n");
         },
@@ -181,4 +217,5 @@ pub fn printError(_: anytype, comptime fmt: []const u8, args_: anytype) !void {
     var stderr_buf: [4096]u8 = undefined;
     var stderr_writer = std.fs.File.stderr().writer(&stderr_buf);
     try (&stderr_writer.interface).print("error: " ++ fmt ++ "\n", args_);
+    try stderr_writer.end();
 }

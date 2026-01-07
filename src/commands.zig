@@ -324,6 +324,193 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     }
 }
 
+pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stderr_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    defer stdout.end() catch {};
+    defer stderr.end() catch {};
+
+    if (args.target == null) {
+        try cli.printError(stderr, "link requires child todo ID", .{});
+        try cli.printCommandHelp(&stdout, .link);
+        return error.MissingId;
+    }
+
+    if (args.parent == null) {
+        try cli.printError(stderr, "link requires parent todo ID", .{});
+        try cli.printCommandHelp(&stdout, .link);
+        return error.MissingParentId;
+    }
+
+    const child_id = args.target.?;
+    const parent_id = args.parent.?;
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    // Verify both todos exist
+    const child_idx = todo_list.findIndexById(child_id) orelse {
+        try cli.printError(stderr, "child todo not found: {s}", .{child_id});
+        return error.TodoNotFound;
+    };
+
+    if (todo_list.findById(parent_id) == null) {
+        try cli.printError(stderr, "parent todo not found: {s}", .{parent_id});
+        return error.TodoNotFound;
+    }
+
+    // Check for circular dependency
+    if (wouldCreateCycle(&todo_list, child_id, parent_id)) {
+        try cli.printError(stderr, "linking would create a circular dependency", .{});
+        return error.CircularDependency;
+    }
+
+    // Check if already linked
+    for (todo_list.todos[child_idx].depends_on) |dep| {
+        if (std.mem.eql(u8, dep, parent_id)) {
+            try cli.printError(stderr, "todo already depends on parent: {s}", .{parent_id});
+            return error.AlreadyLinked;
+        }
+    }
+
+    // Add parent to child's depends_on
+    const old_deps = todo_list.todos[child_idx].depends_on;
+    const new_deps = try allocator.alloc([]const u8, old_deps.len + 1);
+    for (old_deps, 0..) |dep, i| {
+        new_deps[i] = try allocator.dupe(u8, dep);
+    }
+    new_deps[old_deps.len] = try allocator.dupe(u8, parent_id);
+
+    // Free old depends_on strings
+    for (old_deps) |dep| allocator.free(dep);
+    allocator.free(old_deps);
+
+    todo_list.todos[child_idx].depends_on = new_deps;
+
+    // Update timestamp
+    allocator.free(todo_list.todos[child_idx].updated_at);
+    todo_list.todos[child_idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+
+    // Recompute blocked_by for all todos
+    try todo_list.computeBlockedBy();
+
+    try st.save(&todo_list);
+
+    try stdout.interface.print("Linked: {s} now depends on {s}\n", .{ child_id, parent_id });
+}
+
+pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stderr_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    defer stdout.end() catch {};
+    defer stderr.end() catch {};
+
+    if (args.target == null) {
+        try cli.printError(stderr, "unlink requires child todo ID", .{});
+        try cli.printCommandHelp(&stdout, .unlink);
+        return error.MissingId;
+    }
+
+    if (args.from == null) {
+        try cli.printError(stderr, "unlink requires --from <parent-id>", .{});
+        try cli.printCommandHelp(&stdout, .unlink);
+        return error.MissingParentId;
+    }
+
+    const child_id = args.target.?;
+    const parent_id = args.from.?;
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    const child_idx = todo_list.findIndexById(child_id) orelse {
+        try cli.printError(stderr, "child todo not found: {s}", .{child_id});
+        return error.TodoNotFound;
+    };
+
+    // Find and remove parent from depends_on
+    var found = false;
+    var new_idx: usize = 0;
+    const old_deps = todo_list.todos[child_idx].depends_on;
+    var new_deps = try allocator.alloc([]const u8, old_deps.len);
+
+    for (old_deps) |dep| {
+        if (!std.mem.eql(u8, dep, parent_id)) {
+            new_deps[new_idx] = try allocator.dupe(u8, dep);
+            new_idx += 1;
+        } else {
+            found = true;
+            // Don't free dep here - it's still owned by old_deps
+            // It will be freed when old_deps is freed
+        }
+    }
+
+    if (!found) {
+        try cli.printError(stderr, "todo does not depend on parent: {s}", .{parent_id});
+        // Free the new deps we allocated
+        for (new_deps[0..new_idx]) |dep| allocator.free(dep);
+        allocator.free(new_deps);
+        return error.NotLinked;
+    }
+
+    // Shrink to fit
+    const final_deps = try allocator.realloc(new_deps, new_idx);
+
+    // Free old depends_on strings and array
+    for (old_deps) |dep| allocator.free(dep);
+    allocator.free(old_deps);
+
+    todo_list.todos[child_idx].depends_on = final_deps;
+
+    // Update timestamp
+    allocator.free(todo_list.todos[child_idx].updated_at);
+    todo_list.todos[child_idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+
+    // Recompute blocked_by for all todos
+    try todo_list.computeBlockedBy();
+
+    try st.save(&todo_list);
+
+    try stdout.interface.print("Unlinked: {s} no longer depends on {s}\n", .{ child_id, parent_id });
+}
+
+fn wouldCreateCycle(todo_list: *const todo.TodoList, child_id: []const u8, parent_id: []const u8) bool {
+    // Check if adding parent_id to child_id would create a cycle
+    // This happens if parent_id transitively depends on child_id
+    var visited = std.StringHashMapUnmanaged(void){};
+    defer visited.deinit(todo_list.allocator);
+
+    return hasPath(todo_list, parent_id, child_id, &visited) catch false;
+}
+
+fn hasPath(todo_list: *const todo.TodoList, from: []const u8, to: []const u8, visited: *std.StringHashMapUnmanaged(void)) !bool {
+    // If we've already visited this node, there's a cycle
+    if (visited.get(from) != null) return false;
+
+    try visited.put(todo_list.allocator, from, {});
+
+    // Direct dependency found
+    const from_todo = todo_list.findById(from) orelse return false;
+
+    for (from_todo.depends_on) |dep_id| {
+        if (std.mem.eql(u8, dep_id, to)) {
+            return true;
+        }
+        // Recursively check
+        if (try hasPath(todo_list, dep_id, to, visited)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 fn outputList(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
     const w = &writer.interface;
 

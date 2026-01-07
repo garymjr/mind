@@ -79,7 +79,9 @@ pub fn main() !void {
         .done => try commands.executeDone(allocator, parsed, MIND_FILE),
         .next => try commands.executeNext(allocator, parsed, MIND_FILE),
         .delete => try commands.executeDelete(allocator, parsed, MIND_FILE),
-        .tag, .untag, .link, .unlink => {
+        .link => try commands.executeLink(allocator, parsed, MIND_FILE),
+        .unlink => try commands.executeUnlink(allocator, parsed, MIND_FILE),
+        .tag, .untag => {
             const stderr = std.fs.File.stderr();
             try stderr.writeAll("error: command '");
             try stderr.writeAll(@tagName(parsed.command));

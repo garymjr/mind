@@ -5,8 +5,9 @@ const MAX_TITLE_LENGTH = 100;
 pub fn generateId(allocator: std.mem.Allocator) ![]const u8 {
     const timestamp = std.time.timestamp();
 
-    // Get milliseconds for uniqueness
-    const ms = @as(u32, @intCast(@rem(timestamp, 1000)));
+    // Get milliseconds from nanosecond timestamp
+    const ns = std.time.nanoTimestamp();
+    const ms = @as(u32, @intCast(@divTrunc(@rem(ns, 1_000_000_000), 1_000_000)));
 
     return std.fmt.allocPrint(allocator, "{d}-{d:0>3}", .{ timestamp, ms });
 }

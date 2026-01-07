@@ -36,6 +36,7 @@ pub const Args = struct {
     all: bool = false,
     json: bool = false,
     force: bool = false,
+    parent: ?[]const u8 = null, // second ID for link command
 };
 
 const FLAG_DEFINITIONS = struct {
@@ -150,12 +151,19 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
         } else {
             // Positional argument
             // For 'add' command, first positional arg is title
+            // For 'link' command, positional args are: child, parent
             // For other commands, first positional arg is target (id)
             if (result.command == .add) {
                 if (result.title == null) {
                     result.title = arg;
                 } else if (result.target == null) {
                     result.target = arg;
+                }
+            } else if (result.command == .link) {
+                if (result.target == null) {
+                    result.target = arg; // child
+                } else if (result.parent == null) {
+                    result.parent = arg; // parent
                 }
             } else {
                 if (result.target == null) {
