@@ -166,7 +166,8 @@ const QUICKSTART_TEXT =
     \\
     \\5. Mark a todo as done:
     \\       $ mind done <id>
-    \\       (Use 'done' when you finish a todo)
+    \\       $ mind done <id> --reason "Completed successfully"
+    \\       (Use 'done' when you finish a todo; optionally add a reason)
     \\
     \\6. Find the next task to work on:
     \\       $ mind next
@@ -208,7 +209,7 @@ const QUICKSTART_TEXT =
     \\Track bugs:
     \\   1. mind add "Fix login crash" --tags "bug,critical"
     \\   2. mind list --tag bug
-    \\   3. mind done <bug-id>
+    \\   3. mind done <bug-id> --reason "Fixed null pointer dereference"
     \\
     \\══════════════════════════════════════════════════════════════════
     \\FOR MORE HELP
