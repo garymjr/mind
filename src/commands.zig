@@ -112,6 +112,118 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     }
 }
 
+pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stderr_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    defer stdout.end() catch {};
+    defer stderr.end() catch {};
+
+    if (args.target == null) {
+        try cli.printError(stderr, "delete requires a todo ID", .{});
+        try cli.printCommandHelp(&stdout, .delete);
+        return error.MissingId;
+    }
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    const todo_to_delete = todo_list.findById(args.target.?) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.target.?});
+        return error.TodoNotFound;
+    };
+
+    // Collect all linked todos
+    var linked_ids = std.ArrayListUnmanaged([]const u8){};
+    defer {
+        for (linked_ids.items) |id| allocator.free(id);
+        linked_ids.deinit(allocator);
+    }
+
+    // Add dependencies (depends_on)
+    for (todo_to_delete.depends_on) |dep_id| {
+        try linked_ids.append(allocator, try allocator.dupe(u8, dep_id));
+    }
+
+    // Add todos blocked by this one
+    for (todo_to_delete.blocked_by) |blocked_id| {
+        try linked_ids.append(allocator, try allocator.dupe(u8, blocked_id));
+    }
+
+    // If there are linked todos and not forcing, error
+    if (linked_ids.items.len > 0 and !args.force) {
+        try stderr.interface.writeAll("error: cannot delete todo with linked dependencies\n");
+        try stderr.interface.writeAll("  depends on: ");
+        for (todo_to_delete.depends_on, 0..) |dep, i| {
+            if (i > 0) try stderr.interface.writeAll(", ");
+            try stderr.interface.print("{s}", .{dep});
+        }
+        try stderr.interface.writeAll("\n  blocked by: ");
+        for (todo_to_delete.blocked_by, 0..) |blocked, i| {
+            if (i > 0) try stderr.interface.writeAll(", ");
+            try stderr.interface.print("{s}", .{blocked});
+        }
+        try stderr.interface.writeAll("\n\n");
+        try stderr.interface.writeAll("Use --force to delete this todo and all linked todos.\n");
+        return error.TodoHasLinks;
+    }
+
+    // Delete all linked todos if forcing
+    if (args.force) {
+        var deleted_count: usize = 1; // Start with the main todo
+
+        // Recursively delete all linked todos
+        var i: usize = 0;
+        while (i < linked_ids.items.len) {
+            const id = linked_ids.items[i];
+            if (todo_list.findById(id)) |linked_todo| {
+                // Add this todo's dependencies to the list
+                for (linked_todo.depends_on) |dep_id| {
+                    var already_in_list = false;
+                    for (linked_ids.items) |existing_id| {
+                        if (std.mem.eql(u8, existing_id, dep_id)) {
+                            already_in_list = true;
+                            break;
+                        }
+                    }
+                    if (!already_in_list and !std.mem.eql(u8, dep_id, args.target.?)) {
+                        try linked_ids.append(allocator, try allocator.dupe(u8, dep_id));
+                    }
+                }
+                // Add this todo's blockers to the list
+                for (linked_todo.blocked_by) |blocked_id| {
+                    var already_in_list = false;
+                    for (linked_ids.items) |existing_id| {
+                        if (std.mem.eql(u8, existing_id, blocked_id)) {
+                            already_in_list = true;
+                            break;
+                        }
+                    }
+                    if (!already_in_list and !std.mem.eql(u8, blocked_id, args.target.?)) {
+                        try linked_ids.append(allocator, try allocator.dupe(u8, blocked_id));
+                    }
+                }
+                try todo_list.remove(id);
+                deleted_count += 1;
+            }
+            i += 1;
+        }
+
+        // Delete the main todo
+        try todo_list.remove(args.target.?);
+
+        try stdout.interface.print("Deleted {d} todos (including dependencies)\n", .{deleted_count});
+    } else {
+        // Just delete the single todo
+        try todo_list.remove(args.target.?);
+        try stdout.interface.print("Deleted todo: {s}\n", .{args.target.?});
+    }
+
+    try st.save(&todo_list);
+}
+
 pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
     var stdout_buf: [4096]u8 = undefined;
     var stderr_buf: [4096]u8 = undefined;

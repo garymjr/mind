@@ -57,6 +57,7 @@ pub fn main() !void {
                     .list => try stderr.writeAll("List todos\n    Usage: mind list [--status <s>] [--tag <tag>] [--blocked] [--unblocked] [--json]\n"),
                     .show => try stderr.writeAll("Show todo details\n    Usage: mind show <id> [--json]\n"),
                     .done => try stderr.writeAll("Mark todo as done\n    Usage: mind done <id>\n"),
+                    .delete => try stderr.writeAll("Delete a todo\n    Usage: mind delete <id> [--force]\n"),
                     else => try stderr.writeAll("Command help not yet implemented\n"),
                 }
             } else {
@@ -83,7 +84,8 @@ pub fn main() !void {
         .list => try commands.executeList(allocator, parsed, MIND_FILE),
         .show => try commands.executeShow(allocator, parsed, MIND_FILE),
         .done => try commands.executeDone(allocator, parsed, MIND_FILE),
-        .tag, .untag, .link, .unlink, .delete => {
+        .delete => try commands.executeDelete(allocator, parsed, MIND_FILE),
+        .tag, .untag, .link, .unlink => {
             const stderr = std.fs.File.stderr();
             try stderr.writeAll("error: command '");
             try stderr.writeAll(@tagName(parsed.command));
@@ -111,7 +113,8 @@ const HELP_TEXT =
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
     \\    unlink <id> --from <id>  Remove dependency link
-    \\    delete <id>              Delete a todo
+    \\    delete <id> [--force]    Delete a todo
+    \\    remove <id> [--force]    Alias for delete
     \\    help [command]           Show help for command
     \\
     \\FLAGS:

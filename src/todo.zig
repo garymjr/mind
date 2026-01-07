@@ -104,7 +104,11 @@ pub const TodoList = struct {
             self.todos[i - 1] = self.todos[i];
         }
 
-        self.todos = self.allocator.shrink(self.todos, self.todos.len - 1);
+        self.todos = self.allocator.realloc(self.todos, self.todos.len - 1) catch |err| {
+            // If shrink fails, we still have the original array, just try to shrink from end
+            // This is a best-effort, shouldn't happen in practice
+            return err;
+        };
     }
 
     pub fn computeBlockedBy(self: *TodoList) !void {
@@ -141,6 +145,10 @@ pub const TodoList = struct {
         for (self.todos, 0..) |*todo, i| {
             self.allocator.free(todo.blocked_by);
             todo.blocked_by = try blocked_lists.items[i].toOwnedSlice(self.allocator);
+            // Free the old backing array from the ArrayList
+            if (blocked_lists.items[i].capacity > 0) {
+                self.allocator.free(blocked_lists.items[i].allocatedSlice());
+            }
             blocked_lists.items[i] = .{}; // Clear so destructor doesn't double-free
         }
     }

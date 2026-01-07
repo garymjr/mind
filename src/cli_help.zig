@@ -125,6 +125,26 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
             );
         },
+        .delete => {
+            try writer.interface.writeAll(
+                \\Delete a todo
+                \\
+                \\USAGE:
+                \\    mind delete <id> [--force]
+                \\    mind remove <id> [--force]
+                \\
+                \\FLAGS:
+                \\    --force            Delete todo and all linked todos
+                \\
+                \\NOTE: Cannot delete a todo with linked dependencies without --force
+                \\
+                \\EXAMPLES:
+                \\    mind delete 1736205028-001
+                \\    mind remove 1736205028-001 --force
+                \\
+                \\
+            );
+        },
         else => {
             try writer.interface.writeAll("Command help not yet implemented. Use 'mind --help' for overview.\n");
         },

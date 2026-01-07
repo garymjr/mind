@@ -85,7 +85,6 @@ pub const Storage = struct {
                 else => return error.InvalidFormat,
             };
             var tags = std.ArrayListUnmanaged([]const u8){};
-            errdefer tags.deinit(self.allocator);
             for (tags_arr.items) |tag_item| {
                 const tag = try self.allocator.dupe(u8, switch (tag_item) {
                     .string => |s| s,
@@ -101,7 +100,6 @@ pub const Storage = struct {
                 else => return error.InvalidFormat,
             };
             var depends_on = std.ArrayListUnmanaged([]const u8){};
-            errdefer depends_on.deinit(self.allocator);
             for (depends_arr.items) |dep_item| {
                 const dep = try self.allocator.dupe(u8, switch (dep_item) {
                     .string => |s| s,
@@ -117,7 +115,6 @@ pub const Storage = struct {
                 else => return error.InvalidFormat,
             };
             var blocked_by = std.ArrayListUnmanaged([]const u8){};
-            errdefer blocked_by.deinit(self.allocator);
             for (blocked_arr.items) |blocked_item| {
                 const blocked = try self.allocator.dupe(u8, switch (blocked_item) {
                     .string => |s| s,
@@ -141,14 +138,18 @@ pub const Storage = struct {
             });
             errdefer self.allocator.free(updated_at);
 
+            const tags_slice = try tags.toOwnedSlice(self.allocator);
+            const depends_slice = try depends_on.toOwnedSlice(self.allocator);
+            const blocked_slice = try blocked_by.toOwnedSlice(self.allocator);
+
             try todo_list.add(todo.Todo{
                 .id = id,
                 .title = title,
                 .body = body,
                 .status = status,
-                .tags = try tags.toOwnedSlice(self.allocator),
-                .depends_on = try depends_on.toOwnedSlice(self.allocator),
-                .blocked_by = try blocked_by.toOwnedSlice(self.allocator),
+                .tags = tags_slice,
+                .depends_on = depends_slice,
+                .blocked_by = blocked_slice,
                 .created_at = created_at,
                 .updated_at = updated_at,
             });

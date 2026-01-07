@@ -32,6 +32,7 @@ pub const Args = struct {
     blocked_only: bool = false,
     unblocked_only: bool = false,
     json: bool = false,
+    force: bool = false,
 };
 
 const FLAG_DEFINITIONS = struct {
@@ -43,6 +44,7 @@ const FLAG_DEFINITIONS = struct {
     const UNBLOCKED = "--unblocked";
     const JSON = "--json";
     const FROM = "--from";
+    const FORCE = "--force";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -116,6 +118,12 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.FORCE)) {
+            result.force = true;
+            i += 1;
+            continue;
+        }
+
         // Not a flag, must be a command or positional argument
         if (result.command == .none) {
             // Parse command
@@ -156,5 +164,6 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "link")) return .link;
     if (std.mem.eql(u8, str, "unlink")) return .unlink;
     if (std.mem.eql(u8, str, "delete")) return .delete;
+    if (std.mem.eql(u8, str, "remove")) return .delete;
     return null;
 }
