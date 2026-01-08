@@ -14,3 +14,4 @@ pub const Untag = @import("cli_args/untag.zig");
 pub const Link = @import("cli_args/link.zig");
 pub const Unlink = @import("cli_args/unlink.zig");
 pub const Delete = @import("cli_args/delete.zig");
+pub const Archive = @import("cli_args/archive.zig");

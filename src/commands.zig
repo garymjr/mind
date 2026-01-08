@@ -1108,6 +1108,120 @@ pub fn executeUntag(allocator: std.mem.Allocator, args: cli_args.Untag.Args, sto
     try stdout.end();
 }
 
+pub fn executeArchive(allocator: std.mem.Allocator, args: cli_args.Archive.Args, store_path: []const u8) !void {
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
+
+    const archive_path = ".mind/archive.json";
+    const current_time = std.time.timestamp();
+    const cutoff_time = current_time - (@as(i64, @intCast(args.days)) * 86400); // days * seconds_per_day
+
+    // Load current todos
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    // Load existing archive (if any)
+    var archive_todo_list = todo.TodoList.init(allocator);
+    defer archive_todo_list.deinit();
+
+    // Try to load existing archive
+    if (std.fs.cwd().openFile(archive_path, .{})) |archive_file| {
+        archive_file.close();
+        var archive_st = storage.Storage.init(allocator, archive_path);
+        archive_todo_list = try archive_st.load();
+    } else |err| {
+        if (err != error.FileNotFound) {
+            try cli.printError(stderr, "error loading archive: {}", .{err});
+            return err;
+        }
+    }
+
+    // Collect todos to archive (done and older than cutoff)
+    var to_archive = std.ArrayListUnmanaged(usize){};
+    defer to_archive.deinit(allocator);
+
+    for (todo_list.todos, 0..) |item, idx| {
+        if (item.status != .done) continue;
+
+        const updated_at = std.fmt.parseInt(i64, item.updated_at, 10) catch 0;
+        if (updated_at < cutoff_time) {
+            try to_archive.append(allocator, idx);
+        }
+    }
+
+    if (to_archive.items.len == 0) {
+        try stdout.interface.print("No todos to archive (done older than {d} days)\n", .{args.days});
+        try stdout.end();
+        return;
+    }
+
+    if (args.dry_run) {
+        try stdout.interface.print("Would archive {d} todos (older than {d} days):\n", .{ to_archive.items.len, args.days });
+        for (to_archive.items) |idx| {
+            try stdout.interface.print("  {s} {s}\n", .{ todo_list.todos[idx].id, todo_list.todos[idx].title });
+        }
+        try stdout.end();
+        return;
+    }
+
+    // Show what will be archived
+    try stdout.interface.print("Archiving {d} todos (older than {d} days):\n", .{ to_archive.items.len, args.days });
+    for (to_archive.items) |idx| {
+        try stdout.interface.print("  {s} {s}\n", .{ todo_list.todos[idx].id, todo_list.todos[idx].title });
+    }
+    try stdout.interface.writeAll("\n");
+
+    // Archive the todos by moving them to the archive list
+    // We need to process in reverse order to maintain correct indices
+    std.sort.insertion(usize, to_archive.items, {}, struct {
+        fn lessThan(_: void, a: usize, b: usize) bool {
+            return a > b; // descending order
+        }
+    }.lessThan);
+
+    for (to_archive.items) |idx| {
+        try archive_todo_list.add(todo_list.todos[idx]);
+        // Mark as removed from todo_list (we'll rebuild the list)
+    }
+
+    // Rebuild active todo list without archived items
+    var new_todos = try allocator.alloc(todo.Todo, todo_list.todos.len - to_archive.items.len);
+    var new_idx: usize = 0;
+    var archived_count: usize = 0;
+
+    for (todo_list.todos) |item| {
+        var is_archived = false;
+        for (to_archive.items) |archive_idx| {
+            if (item.id.ptr == todo_list.todos[archive_idx].id.ptr) {
+                is_archived = true;
+                break;
+            }
+        }
+        if (!is_archived) {
+            new_todos[new_idx] = item;
+            new_idx += 1;
+        } else {
+            archived_count += 1;
+        }
+    }
+
+    allocator.free(todo_list.todos);
+    todo_list.todos = new_todos;
+
+    // Save both files
+    var archive_st = storage.Storage.init(allocator, archive_path);
+    try archive_st.save(&archive_todo_list);
+    try st.save(&todo_list);
+
+    try stdout.interface.print("Archived {d} todos to {s}\n", .{ archived_count, archive_path });
+    try stdout.end();
+}
+
 fn wouldCreateCycle(todo_list: *const todo.TodoList, child_id: []const u8, parent_id: []const u8) bool {
     // Check if adding parent_id to child_id would create a cycle
     // This happens if parent_id transitively depends on child_id

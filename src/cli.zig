@@ -23,6 +23,7 @@ pub const Command = enum {
     link,
     unlink,
     delete,
+    archive,
 };
 
 // Tagged union for command-specific arguments
@@ -43,6 +44,7 @@ pub const CommandArgs = union(Command) {
     link: cli_args.Link.Args,
     unlink: cli_args.Unlink.Args,
     delete: cli_args.Delete.Args,
+    archive: cli_args.Archive.Args,
 };
 
 // Global-only flags (help)
@@ -69,6 +71,7 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "unlink")) return .unlink;
     if (std.mem.eql(u8, str, "delete")) return .delete;
     if (std.mem.eql(u8, str, "remove")) return .delete;
+    if (std.mem.eql(u8, str, "archive")) return .archive;
     return null;
 }
 
@@ -110,6 +113,7 @@ pub fn parseCommandArgs(command: Command, args: []const []const u8) !CommandArgs
         .link => CommandArgs{ .link = try cli_args.Link.parse(cmd_args) },
         .unlink => CommandArgs{ .unlink = try cli_args.Unlink.parse(cmd_args) },
         .delete => CommandArgs{ .delete = try cli_args.Delete.parse(cmd_args) },
+        .archive => CommandArgs{ .archive = try cli_args.Archive.parse(cmd_args) },
         .help => {
             // help command takes optional command name as positional arg
             if (cmd_args.len > 0) {
@@ -135,6 +139,7 @@ pub fn formatParseError(err: anyerror, _: Command) []const u8 {
         error.UnexpectedPositional => "unexpected positional argument",
         error.ConflictingFlags => "conflicting flags specified",
         error.MissingEditField => "edit requires at least one field: --title, --body, --status, or --tags",
+        error.InvalidDaysValue => "--days must be a positive integer",
         error.ShowHelp => "", // Will be handled separately
         else => "unknown error",
     };

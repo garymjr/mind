@@ -22,6 +22,7 @@ const HELP_TEXT: []const u8 =
     \\    link <child> <parent>    Link todos (parent blocks child)
     \\    unlink <id> --from <id>  Remove dependency link
     \\    delete <id>              Delete a todo
+    \\    archive                  Archive old done tasks
     \\    help [command]           Show help for command
     \\
     \\FLAGS:
@@ -39,6 +40,8 @@ const HELP_TEXT: []const u8 =
     \\    --reason <text>          Set resolution reason (for 'done')
     \\    --force                  Delete with dependencies (for 'delete')
     \\    --yes                    Skip confirmation prompts
+    \\    --days <n>               Age threshold for archive (default: 30)
+    \\    --dry-run                Preview archive without making changes
     \\    --json                   Output as JSON
     \\    --help, -h               Show this help
     \\
@@ -54,10 +57,13 @@ const HELP_TEXT: []const u8 =
     \\    mind next
     \\    mind next --all
     \\    mind link 1234567890-002 1234567890-001
+    \\    mind archive
+    \\    mind archive --days 60
     \\    mind list --json
     \\
     \\STORAGE:
     \\    Todos stored in .mind/mind.json (version control friendly)
+    \\    Archived todos stored in .mind/archive.json
     \\
     \\
 ;
@@ -331,6 +337,36 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
                 \\EXAMPLES:
                 \\    mind untag 1736205028-001 urgent
+                \\
+                \\
+            );
+        },
+        .archive => {
+            try writer.interface.writeAll(
+                \\Archive old done tasks
+                \\
+                \\USAGE:
+                \\    mind archive [--days <n>] [--dry-run]
+                \\
+                \\FLAGS:
+                \\    --days <n>         Age threshold in days (default: 30)
+                \\    --dry-run          Preview what would be archived without making changes
+                \\
+                \\Moves completed todos older than the specified number of days from
+                \\mind.json to archive.json. This keeps your active view clean while
+                \\preserving history.
+                \\
+                \\Only done todos are archived. The age is calculated based on when
+                \\the todo was last updated (marked done).
+                \\
+                \\EXAMPLES:
+                \\    mind archive                         # Archive done todos older than 30 days
+                \\    mind archive --days 60               # Archive done todos older than 60 days
+                \\    mind archive --dry-run               # Preview what would be archived
+                \\
+                \\To view archived todos:
+                \\    # You can use jq or other tools to inspect archive.json
+                \\    cat .mind/archive.json
                 \\
                 \\
             );

@@ -105,6 +105,16 @@ mind done <id1> <id2> ...                          # Mark multiple as done
 mind done <id> --json                             # Mark done, JSON output
 ```
 
+### Archiving Completed Tasks
+
+```bash
+mind archive                                      # Archive done todos older than 30 days
+mind archive --days 60                           # Archive done todos older than 60 days
+mind archive --dry-run                           # Preview what would be archived
+```
+
+Archive moves completed todos to `.mind/archive.json` to keep your active view clean while preserving history. Only `done` todos are archived, based on when they were last updated (marked done).
+
 ## Dependency Management
 
 ### Creating Dependencies

@@ -112,6 +112,7 @@ pub fn main() !void {
         .untag => try commands.executeUntag(allocator, cmd_args.untag, MIND_FILE),
         .link => try commands.executeLink(allocator, cmd_args.link, MIND_FILE),
         .unlink => try commands.executeUnlink(allocator, cmd_args.unlink, MIND_FILE),
+        .archive => try commands.executeArchive(allocator, cmd_args.archive, MIND_FILE),
         .help, .quickstart, .none => unreachable,
     }
 }
@@ -139,6 +140,7 @@ const HELP_TEXT =
     \\    unlink <id> --from <id>  Remove dependency link
     \\    delete <id>              Delete a todo
     \\    remove <id>              Alias for delete
+    \\    archive                  Archive old done tasks
     \\    help [command]           Show help for command
     \\
     \\FLAGS:
@@ -159,10 +161,13 @@ const HELP_TEXT =
     \\    mind next
     \\    mind next --all
     \\    mind link 1234567890-002 1234567890-001
+    \\    mind archive
+    \\    mind archive --days 60
     \\    mind list --json
     \\
     \\STORAGE:
     \\    Todos stored in .mind/mind.json (version control friendly)
+    \\    Archived todos stored in .mind/archive.json
     \\
     \\Use 'mind help <command>' for command-specific flags and options.
     \\
