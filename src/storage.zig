@@ -11,10 +11,21 @@ fn escapeJsonString(allocator: std.mem.Allocator, input: []const u8) ![]const u8
         switch (c) {
             '\\' => try result.appendSlice(allocator, "\\\\"),
             '"' => try result.appendSlice(allocator, "\\\""),
+            '/' => try result.appendSlice(allocator, "\\/"),
+            0x08 => try result.appendSlice(allocator, "\\b"), // backspace
+            0x0C => try result.appendSlice(allocator, "\\f"), // form feed
             '\n' => try result.appendSlice(allocator, "\\n"),
             '\r' => try result.appendSlice(allocator, "\\r"),
             '\t' => try result.appendSlice(allocator, "\\t"),
-            else => try result.append(allocator, c),
+            else => {
+                // Escape control characters U+0000 to U+001F as \uXXXX
+                if (c < 0x20) {
+                    try result.appendSlice(allocator, "\\u00");
+                    try std.fmt.formatInt(c, 16, .lower, .{ .width = 2, .fill = '0' }, result.writer(allocator).any());
+                } else {
+                    try result.append(allocator, c);
+                }
+            },
         }
     }
 
@@ -329,4 +340,56 @@ test "escapeJsonString handles empty string" {
     const result = try escapeJsonString(allocator, "");
     defer allocator.free(result);
     try std.testing.expectEqualStrings("", result);
+}
+
+test "escapeJsonString escapes forward slash" {
+    const allocator = std.testing.allocator;
+    const result = try escapeJsonString(allocator, "path/to/file");
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("path\\/to\\/file", result);
+}
+
+test "escapeJsonString escapes backspace" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 't', 'e', 'x', 't', 0x08, 'm', 'o', 'r', 'e' };
+    const result = try escapeJsonString(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("text\\bmore", result);
+}
+
+test "escapeJsonString escapes form feed" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'p', 'a', 'g', 'e', '1', 0x0C, 'p', 'a', 'g', 'e', '2' };
+    const result = try escapeJsonString(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("page1\\fpage2", result);
+}
+
+test "escapeJsonString escapes null character" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 't', 'e', 'x', 't', 0x00, 'm', 'o', 'r', 'e' };
+    const result = try escapeJsonString(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("text\\u0000more", result);
+}
+
+test "escapeJsonString escapes control characters with hex" {
+    const allocator = std.testing.allocator;
+    // Test various control characters: \x01, \x1F, \x0B (vertical tab)
+    const input = [_]u8{ 0x01, 'a', 0x1F, 'b', 0x0B, 'c' };
+    const result = try escapeJsonString(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\\u0001a\\u001fb\\u000bc", result);
+}
+
+test "escapeJsonString escapes all control chars from 0x00 to 0x1F" {
+    const allocator = std.testing.allocator;
+    var input: [32]u8 = undefined;
+    for (&input, 0..) |*c, i| c.* = @intCast(i);
+
+    const result = try escapeJsonString(allocator, &input);
+    defer allocator.free(result);
+
+    const expected = "\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f";
+    try std.testing.expectEqualStrings(expected, result);
 }
