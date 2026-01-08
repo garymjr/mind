@@ -1,21 +1,17 @@
 const std = @import("std");
 const cli = @import("cli.zig");
+const cli_args = @import("cli_args.zig");
 const todo = @import("todo.zig");
 const util = @import("util.zig");
 const storage = @import("storage.zig");
 
 const BODY_HINT = "Tip: Add a body with --body to provide context for this todo";
 
-pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeAdd(allocator: std.mem.Allocator, args: cli_args.Add.Args, store_path: []const u8) !void {
     const stdout = std.fs.File.stdout();
     const stderr = std.fs.File.stderr();
 
-    if (args.title == null) {
-        try stderr.writeAll("error: add requires a title\n");
-        return error.MissingTitle;
-    }
-
-    if (args.title.?.len == 0) {
+    if (args.title.len == 0) {
         try stderr.writeAll("error: title cannot be empty\n");
         return error.TitleEmpty;
     }
@@ -41,7 +37,7 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []co
 
     const new_todo = try todo.createTodo(
         allocator,
-        args.title.?,
+        args.title,
         body,
         tags_list.items,
         &.{},
@@ -72,7 +68,7 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []co
     }
 }
 
-pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeEdit(allocator: std.mem.Allocator, args: cli_args.Edit.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -80,32 +76,19 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    if (args.target == null) {
-        try cli.printError(stderr, "edit requires a todo ID", .{});
-        try cli.printCommandHelp(&stdout, .edit);
-        return error.MissingId;
-    }
-
     // Validate ID format
-    util.validateId(args.target.?) catch |err| {
-        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+    util.validateId(args.id) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
         try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
         return err;
     };
-
-    // At least one field must be specified to edit
-    if (args.title == null and args.body == null and args.status == null and args.tags == null) {
-        try cli.printError(stderr, "edit requires at least one field to edit: --title, --body, --status, or --tags", .{});
-        try cli.printCommandHelp(&stdout, .edit);
-        return error.MissingEditField;
-    }
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
     defer todo_list.deinit();
 
-    const idx = todo_list.findIndexById(args.target.?) orelse {
-        try cli.printError(stderr, "todo not found: {s}", .{args.target.?});
+    const idx = todo_list.findIndexById(args.id) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.id});
         return error.TodoNotFound;
     };
 
@@ -172,11 +155,12 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
 
         try st.save(&todo_list);
-        try stdout.interface.print("Updated todo: {s}\n", .{args.target.?});
+        try stdout.interface.print("Updated todo: {s}\n", .{args.id});
+        try stdout.end();
     }
 }
 
-pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []const u8) !void {
+pub fn executeStatus(allocator: std.mem.Allocator, _: cli_args.Status.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     errdefer stdout.end() catch {};
@@ -232,7 +216,7 @@ pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []co
     try stdout.end();
 }
 
-pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeList(allocator: std.mem.Allocator, args: cli_args.List.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     errdefer stdout.end() catch {};
@@ -310,7 +294,7 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     try stdout.end();
 }
 
-pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeShow(allocator: std.mem.Allocator, args: cli_args.Show.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -318,14 +302,9 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    if (args.target == null) {
-        try (&stderr.interface).writeAll("error: show requires a todo ID\n");
-        return error.MissingId;
-    }
-
     // Validate ID format
-    util.validateId(args.target.?) catch |err| {
-        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+    util.validateId(args.id) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
         try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
         return err;
     };
@@ -334,8 +313,8 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var todo_list = try st.load();
     defer todo_list.deinit();
 
-    const item = todo_list.findById(args.target.?) orelse {
-        try cli.printError(stderr, "todo not found: {s}", .{args.target.?});
+    const item = todo_list.findById(args.id) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.id});
         return error.TodoNotFound;
     };
 
@@ -344,9 +323,11 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     } else {
         try outputTodoDetail(&stdout, item.*, &todo_list);
     }
+
+    try stdout.end();
 }
 
-pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeDelete(allocator: std.mem.Allocator, args: cli_args.Delete.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -354,15 +335,9 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    if (args.target == null) {
-        try cli.printError(stderr, "delete requires a todo ID", .{});
-        try cli.printCommandHelp(&stdout, .delete);
-        return error.MissingId;
-    }
-
     // Validate ID format
-    util.validateId(args.target.?) catch |err| {
-        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+    util.validateId(args.id) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
         try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
         return err;
     };
@@ -371,8 +346,8 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     var todo_list = try st.load();
     defer todo_list.deinit();
 
-    const todo_to_delete = todo_list.findById(args.target.?) orelse {
-        try cli.printError(stderr, "todo not found: {s}", .{args.target.?});
+    const todo_to_delete = todo_list.findById(args.id) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.id});
         return error.TodoNotFound;
     };
 
@@ -429,7 +404,7 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
                             break;
                         }
                     }
-                    if (!already_in_list and !std.mem.eql(u8, dep_id, args.target.?)) {
+                    if (!already_in_list and !std.mem.eql(u8, dep_id, args.id)) {
                         try linked_ids.append(allocator, try allocator.dupe(u8, dep_id));
                     }
                 }
@@ -442,7 +417,7 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
                             break;
                         }
                     }
-                    if (!already_in_list and !std.mem.eql(u8, blocked_id, args.target.?)) {
+                    if (!already_in_list and !std.mem.eql(u8, blocked_id, args.id)) {
                         try linked_ids.append(allocator, try allocator.dupe(u8, blocked_id));
                     }
                 }
@@ -454,7 +429,7 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
         const total_to_delete = linked_ids.items.len + 1;
         try stderr.interface.writeAll("WARNING: This will delete ");
         try stderr.interface.print("{d} todos:\n", .{total_to_delete});
-        try stderr.interface.print("  Target: {s} {s}\n", .{ args.target.?, todo_to_delete.title });
+        try stderr.interface.print("  Target: {s} {s}\n", .{ args.id, todo_to_delete.title });
         for (linked_ids.items) |id| {
             if (todo_list.findById(id)) |t| {
                 try stderr.interface.print("    {s} {s}\n", .{ id, t.title });
@@ -485,19 +460,21 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
         }
 
         // Delete the main todo
-        try todo_list.remove(args.target.?);
+        try todo_list.remove(args.id);
 
         try stdout.interface.print("Deleted {d} todos\n", .{deleted_count});
     } else {
         // Just delete the single todo
-        try todo_list.remove(args.target.?);
-        try stdout.interface.print("Deleted todo: {s}\n", .{args.target.?});
+        try todo_list.remove(args.id);
+        try stdout.interface.print("Deleted todo: {s}\n", .{args.id});
     }
 
     try st.save(&todo_list);
+
+    try stdout.end();
 }
 
-pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeDone(allocator: std.mem.Allocator, args: cli_args.Done.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -505,15 +482,9 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    if (args.target == null) {
-        try cli.printError(stderr, "done requires a todo ID", .{});
-        try cli.printCommandHelp(&stdout, .done);
-        return error.MissingId;
-    }
-
     // Validate ID format
-    util.validateId(args.target.?) catch |err| {
-        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+    util.validateId(args.id) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
         try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
         return err;
     };
@@ -522,8 +493,8 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var todo_list = try st.load();
     defer todo_list.deinit();
 
-    const idx = todo_list.findIndexById(args.target.?) orelse {
-        try cli.printError(stderr, "todo not found: {s}", .{args.target.?});
+    const idx = todo_list.findIndexById(args.id) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.id});
         return error.TodoNotFound;
     };
 
@@ -548,10 +519,11 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 
     try st.save(&todo_list);
 
-    try stdout.interface.print("Marked todo as done: {s}\n", .{args.target.?});
+    try stdout.interface.print("Marked todo as done: {s}\n", .{args.id});
+    try stdout.end();
 }
 
-pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeNext(allocator: std.mem.Allocator, args: cli_args.Next.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -602,9 +574,11 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         try stdout.interface.writeAll("Next todo:\n");
         try outputTodoDetail(&stdout, next_todo.*, &todo_list);
     }
+
+    try stdout.end();
 }
 
-pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeLink(allocator: std.mem.Allocator, args: cli_args.Link.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -612,20 +586,8 @@ pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    if (args.target == null) {
-        try cli.printError(stderr, "link requires child todo ID", .{});
-        try cli.printCommandHelp(&stdout, .link);
-        return error.MissingId;
-    }
-
-    if (args.parent == null) {
-        try cli.printError(stderr, "link requires parent todo ID", .{});
-        try cli.printCommandHelp(&stdout, .link);
-        return error.MissingParentId;
-    }
-
-    const child_id = args.target.?;
-    const parent_id = args.parent.?;
+    const child_id = args.child_id;
+    const parent_id = args.parent_id;
 
     // Validate ID formats
     util.validateId(child_id) catch |err| {
@@ -692,9 +654,10 @@ pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     try st.save(&todo_list);
 
     try stdout.interface.print("Linked: {s} now depends on {s}\n", .{ child_id, parent_id });
+    try stdout.end();
 }
 
-pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+pub fn executeUnlink(allocator: std.mem.Allocator, args: cli_args.Unlink.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
@@ -702,20 +665,8 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    if (args.target == null) {
-        try cli.printError(stderr, "unlink requires child todo ID", .{});
-        try cli.printCommandHelp(&stdout, .unlink);
-        return error.MissingId;
-    }
-
-    if (args.from == null) {
-        try cli.printError(stderr, "unlink requires --from <parent-id>", .{});
-        try cli.printCommandHelp(&stdout, .unlink);
-        return error.MissingParentId;
-    }
-
-    const child_id = args.target.?;
-    const parent_id = args.from.?;
+    const child_id = args.child_id;
+    const parent_id = args.parent_id;
 
     // Validate ID formats
     util.validateId(child_id) catch |err| {
@@ -782,6 +733,7 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     try st.save(&todo_list);
 
     try stdout.interface.print("Unlinked: {s} no longer depends on {s}\n", .{ child_id, parent_id });
+    try stdout.end();
 }
 
 fn wouldCreateCycle(todo_list: *const todo.TodoList, child_id: []const u8, parent_id: []const u8) bool {
@@ -841,7 +793,7 @@ fn outputList(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
     for (todos) |item| {
         const status_str = item.status.toString();
         const title_trunc = if (item.title.len > 40) item.title[0..40] ++ "..." else item.title;
-        
+
         try w.print("{s} {s:<12} {s}\n", .{ item.id, status_str, title_trunc });
     }
 }

@@ -1,5 +1,6 @@
 const std = @import("std");
 const help = @import("cli_help.zig");
+const cli_args = @import("cli_args.zig");
 
 pub const printFullHelp = help.printFullHelp;
 pub const printCommandHelp = help.printCommandHelp;
@@ -23,187 +24,30 @@ pub const Command = enum {
     delete,
 };
 
-pub const Args = struct {
-    command: Command = .none,
-    target: ?[]const u8 = null, // todo ID or command for help
-    title: ?[]const u8 = null,
-    body: ?[]const u8 = null,
-    tags: ?[]const u8 = null, // comma-separated
-    from: ?[]const u8 = null, // for unlink
-    status: ?[]const u8 = null,
-    tag_filter: ?[]const u8 = null,
-    reason: ?[]const u8 = null, // for done command
-    blocked_only: bool = false,
-    unblocked_only: bool = false,
-    all: bool = false,
-    json: bool = false,
-    force: bool = false,
-    yes: bool = false,
-    parent: ?[]const u8 = null, // second ID for link command
+// Tagged union for command-specific arguments
+pub const CommandArgs = union(Command) {
+    none: void,
+    help: ?[]const u8, // optional command name for detailed help
+    quickstart: void,
+    add: cli_args.Add.Args,
+    edit: cli_args.Edit.Args,
+    list: cli_args.List.Args,
+    show: cli_args.Show.Args,
+    status: cli_args.Status.Args,
+    done: cli_args.Done.Args,
+    next: cli_args.Next.Args,
+    tag: void,
+    untag: void,
+    link: cli_args.Link.Args,
+    unlink: cli_args.Unlink.Args,
+    delete: cli_args.Delete.Args,
 };
 
-const FLAG_DEFINITIONS = struct {
-    const TITLE = "--title";
-    const BODY = "--body";
-    const TAGS = "--tags";
-    const SHORT_TAGS = "-t";
-    const STATUS = "--status";
-    const SHORT_STATUS = "-s";
-    const TAG = "--tag";
-    const BLOCKED = "--blocked";
-    const UNBLOCKED = "--unblocked";
-    const ALL = "--all";
-    const JSON = "--json";
-    const FROM = "--from";
-    const FORCE = "--force";
-    const YES = "--yes";
-    const REASON = "--reason";
+// Global-only flags (help)
+const GLOBAL_FLAGS = struct {
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
-
-pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
-    var result = Args{};
-
-    var i: usize = 1; // Skip program name
-    while (i < args.len) {
-        const arg = args[i];
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.HELP) or std.mem.eql(u8, arg, FLAG_DEFINITIONS.SHORT_HELP)) {
-            return Args{ .command = .help };
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.TITLE)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.title = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.BODY)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.body = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.TAGS) or std.mem.eql(u8, arg, FLAG_DEFINITIONS.SHORT_TAGS)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.tags = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.STATUS) or std.mem.eql(u8, arg, FLAG_DEFINITIONS.SHORT_STATUS)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.status = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.TAG)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.tag_filter = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.FROM)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.from = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.REASON)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.reason = args[i];
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.BLOCKED)) {
-            result.blocked_only = true;
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.UNBLOCKED)) {
-            result.unblocked_only = true;
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.ALL)) {
-            result.all = true;
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.JSON)) {
-            result.json = true;
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.FORCE)) {
-            result.force = true;
-            i += 1;
-            continue;
-        }
-
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.YES)) {
-            result.yes = true;
-            i += 1;
-            continue;
-        }
-
-        // Not a flag, must be a command or positional argument
-        if (result.command == .none) {
-            // Parse command
-            result.command = parseCommand(arg) orelse return error.UnknownCommand;
-        } else {
-            // Positional argument
-            // For 'add' command, first positional arg is title
-            // For 'edit' command, first positional arg is target (id)
-            // For 'link' command, positional args are: child, parent
-            // For other commands, first positional arg is target (id)
-            if (result.command == .add) {
-                if (result.title == null) {
-                    result.title = arg;
-                } else if (result.target == null) {
-                    result.target = arg;
-                }
-            } else if (result.command == .edit) {
-                if (result.target == null) {
-                    result.target = arg;
-                }
-            } else if (result.command == .link) {
-                if (result.target == null) {
-                    result.target = arg; // child
-                } else if (result.parent == null) {
-                    result.parent = arg; // parent
-                }
-            } else {
-                if (result.target == null) {
-                    result.target = arg;
-                } else if (result.title == null and result.command == .add) {
-                    result.title = arg;
-                }
-            }
-        }
-        i += 1;
-    }
-
-    return result;
-}
 
 pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "help")) return .help;
@@ -223,4 +67,70 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "delete")) return .delete;
     if (std.mem.eql(u8, str, "remove")) return .delete;
     return null;
+}
+
+/// Parse global arguments and return the command
+/// Returns the command and the slice of args starting at index 1 (after command)
+pub fn parseGlobal(args: []const []const u8) !struct { command: Command, cmd_args_start: usize } {
+    if (args.len < 2) {
+        return error.NoCommand;
+    }
+
+    const arg = args[1];
+
+    // Check for global --help or -h
+    if (std.mem.eql(u8, arg, GLOBAL_FLAGS.HELP) or std.mem.eql(u8, arg, GLOBAL_FLAGS.SHORT_HELP)) {
+        return .{ .command = .help, .cmd_args_start = 2 };
+    }
+
+    // Parse command
+    const command = parseCommand(arg) orelse return error.UnknownCommand;
+
+    return .{ .command = command, .cmd_args_start = 2 };
+}
+
+/// Parse command-specific arguments
+pub fn parseCommandArgs(command: Command, args: []const []const u8) !CommandArgs {
+    const cmd_args = if (args.len >= 2) args[2..] else &[_][]const u8{};
+
+    return switch (command) {
+        .add => CommandArgs{ .add = try cli_args.Add.parse(cmd_args) },
+        .edit => CommandArgs{ .edit = try cli_args.Edit.parse(cmd_args) },
+        .list => CommandArgs{ .list = try cli_args.List.parse(cmd_args) },
+        .show => CommandArgs{ .show = try cli_args.Show.parse(cmd_args) },
+        .status => CommandArgs{ .status = try cli_args.Status.parse(cmd_args) },
+        .done => CommandArgs{ .done = try cli_args.Done.parse(cmd_args) },
+        .next => CommandArgs{ .next = try cli_args.Next.parse(cmd_args) },
+        .link => CommandArgs{ .link = try cli_args.Link.parse(cmd_args) },
+        .unlink => CommandArgs{ .unlink = try cli_args.Unlink.parse(cmd_args) },
+        .delete => CommandArgs{ .delete = try cli_args.Delete.parse(cmd_args) },
+        .tag => CommandArgs{ .tag = {} },
+        .untag => CommandArgs{ .untag = {} },
+        .help => {
+            // help command takes optional command name as positional arg
+            if (cmd_args.len > 0) {
+                return CommandArgs{ .help = cmd_args[0] };
+            }
+            return CommandArgs{ .help = null };
+        },
+        .quickstart => CommandArgs{ .quickstart = {} },
+        .none => CommandArgs{ .none = {} },
+    };
+}
+
+/// Helper function to format parse errors for user display
+pub fn formatParseError(err: anyerror, _: Command) []const u8 {
+    return switch (err) {
+        error.MissingTitle => "add requires a title",
+        error.MissingId => "command requires a todo ID",
+        error.MissingChildId => "link requires a child todo ID",
+        error.MissingParentId => "link requires a parent todo ID",
+        error.MissingValueForFlag => "flag requires a value",
+        error.UnknownFlag => "unknown flag",
+        error.UnexpectedPositional => "unexpected positional argument",
+        error.ConflictingFlags => "conflicting flags specified",
+        error.MissingEditField => "edit requires at least one field: --title, --body, --status, or --tags",
+        error.ShowHelp => "", // Will be handled separately
+        else => "unknown error",
+    };
 }

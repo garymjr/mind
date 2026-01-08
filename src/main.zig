@@ -26,7 +26,8 @@ pub fn main() !void {
         return;
     }
 
-    const parsed = cli.parseArgs(allocator, args) catch |err| {
+    // Parse global args to get command
+    const global = cli.parseGlobal(args) catch |err| {
         switch (err) {
             error.UnknownCommand => {
                 const stderr = std.fs.File.stderr();
@@ -36,19 +37,16 @@ pub fn main() !void {
                 try stderr.writeAll("\n");
                 try stdout.writeAll(HELP_TEXT);
             },
-            error.MissingValueForFlag => {
-                const stderr = std.fs.File.stderr();
-                try stderr.writeAll("error: flag requires a value\n");
-            },
             else => unreachable,
         }
         std.process.exit(1);
     };
 
-    // Handle --help flag
-    if (parsed.command == .help) {
-        if (parsed.target) |cmd_str| {
-            if (cli.parseCommand(cmd_str)) |cmd| {
+    // Handle help command
+    if (global.command == .help) {
+        const cmd_args = if (global.cmd_args_start < args.len) args[global.cmd_args_start..] else &[_][]const u8{};
+        if (cmd_args.len > 0) {
+            if (cli.parseCommand(cmd_args[0])) |cmd| {
                 var buf: [65536]u8 = undefined;
                 var stderr_writer = std.fs.File.stderr().writer(&buf);
                 defer stderr_writer.end() catch {};
@@ -56,7 +54,7 @@ pub fn main() !void {
             } else {
                 const stderr = std.fs.File.stderr();
                 try stderr.writeAll("error: unknown command: ");
-                try stderr.writeAll(cmd_str);
+                try stderr.writeAll(cmd_args[0]);
                 try stderr.writeAll("\n");
                 std.process.exit(1);
             }
@@ -67,30 +65,58 @@ pub fn main() !void {
         return;
     }
 
+    // Handle quickstart
+    if (global.command == .quickstart) {
+        const stdout = std.fs.File.stdout();
+        try stdout.writeAll(QUICKSTART_TEXT);
+        return;
+    }
+
+    // Parse command-specific arguments
+    const cmd_args = cli.parseCommandArgs(global.command, args) catch |err| {
+        if (err == error.ShowHelp) {
+            // Show help and exit normally (like `git command --help`)
+            const stderr = std.fs.File.stderr();
+            var buf: [65536]u8 = undefined;
+            var stderr_writer = stderr.writer(&buf);
+            defer stderr_writer.end() catch {};
+            try help.printCommandHelp(&stderr_writer, global.command);
+            return;
+        }
+
+        const stderr = std.fs.File.stderr();
+        const msg = cli.formatParseError(err, global.command);
+        try stderr.writeAll("error: ");
+        try stderr.writeAll(msg);
+        try stderr.writeAll("\n");
+        // Show command help on parse error
+        var buf: [65536]u8 = undefined;
+        var stderr_writer = stderr.writer(&buf);
+        defer stderr_writer.end() catch {};
+        try help.printCommandHelp(&stderr_writer, global.command);
+        std.process.exit(1);
+    };
+
     // Execute command
-    switch (parsed.command) {
-        .quickstart => {
-            const stdout = std.fs.File.stdout();
-            try stdout.writeAll(QUICKSTART_TEXT);
-        },
-        .add => try commands.executeAdd(allocator, parsed, MIND_FILE),
-        .edit => try commands.executeEdit(allocator, parsed, MIND_FILE),
-        .list => try commands.executeList(allocator, parsed, MIND_FILE),
-        .show => try commands.executeShow(allocator, parsed, MIND_FILE),
-        .status => try commands.executeStatus(allocator, parsed, MIND_FILE),
-        .done => try commands.executeDone(allocator, parsed, MIND_FILE),
-        .next => try commands.executeNext(allocator, parsed, MIND_FILE),
-        .delete => try commands.executeDelete(allocator, parsed, MIND_FILE),
-        .link => try commands.executeLink(allocator, parsed, MIND_FILE),
-        .unlink => try commands.executeUnlink(allocator, parsed, MIND_FILE),
+    switch (global.command) {
+        .add => try commands.executeAdd(allocator, cmd_args.add, MIND_FILE),
+        .edit => try commands.executeEdit(allocator, cmd_args.edit, MIND_FILE),
+        .list => try commands.executeList(allocator, cmd_args.list, MIND_FILE),
+        .show => try commands.executeShow(allocator, cmd_args.show, MIND_FILE),
+        .status => try commands.executeStatus(allocator, cmd_args.status, MIND_FILE),
+        .done => try commands.executeDone(allocator, cmd_args.done, MIND_FILE),
+        .next => try commands.executeNext(allocator, cmd_args.next, MIND_FILE),
+        .delete => try commands.executeDelete(allocator, cmd_args.delete, MIND_FILE),
+        .link => try commands.executeLink(allocator, cmd_args.link, MIND_FILE),
+        .unlink => try commands.executeUnlink(allocator, cmd_args.unlink, MIND_FILE),
         .tag, .untag => {
             const stderr = std.fs.File.stderr();
             try stderr.writeAll("error: command '");
-            try stderr.writeAll(@tagName(parsed.command));
+            try stderr.writeAll(@tagName(global.command));
             try stderr.writeAll("' not yet implemented\n");
             std.process.exit(1);
         },
-        .none, .help => unreachable,
+        .help, .quickstart, .none => unreachable,
     }
 }
 
