@@ -225,7 +225,7 @@ pub fn createTodo(
 test "createTodo validates title length" {
     const allocator = std.testing.allocator;
     const long_title = "a" ** 101;
-    const result = createTodo(allocator, &long_title, "", &.{}, &.{});
+    const result = createTodo(allocator, long_title, "", &.{}, &.{});
     try std.testing.expectError(error.TitleTooLong, result);
 }
 
