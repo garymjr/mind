@@ -121,7 +121,7 @@ const HELP_TEXT =
     \\FLAGS:
     \\    --title <text>           Set title (for 'edit')
     \\    --body <text>            Set body text (for 'add', 'edit')
-    \\    --tags <t1,t2>           Set tags comma-separated (for 'add', 'edit')
+    \\    --tags, -t <t1,t2>       Set tags comma-separated (for 'add', 'edit')
     \\    --status <s>             Set/filter by status: pending, in-progress, done
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos

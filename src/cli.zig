@@ -45,6 +45,7 @@ const FLAG_DEFINITIONS = struct {
     const TITLE = "--title";
     const BODY = "--body";
     const TAGS = "--tags";
+    const SHORT_TAGS = "-t";
     const STATUS = "--status";
     const TAG = "--tag";
     const BLOCKED = "--blocked";
@@ -85,7 +86,7 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
             continue;
         }
 
-        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.TAGS)) {
+        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.TAGS) or std.mem.eql(u8, arg, FLAG_DEFINITIONS.SHORT_TAGS)) {
             i += 1;
             if (i >= args.len) return error.MissingValueForFlag;
             result.tags = args[i];

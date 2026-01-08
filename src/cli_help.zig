@@ -26,7 +26,7 @@ const HELP_TEXT: []const u8 =
     \\FLAGS:
     \\    --title <text>           Set title (for 'edit')
     \\    --body <text>            Set body text (for 'add', 'edit')
-    \\    --tags <t1,t2>           Set tags comma-separated (for 'add', 'edit')
+    \\    --tags, -t <t1,t2>       Set tags comma-separated (for 'add', 'edit')
     \\    --status <s>             Set/filter by status: pending, in-progress, done
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
@@ -74,7 +74,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
                 \\FLAGS:
                 \\    --body <text>      Optional body text (adds context)
-                \\    --tags <t1,t2>     Comma-separated tags
+                \\    --tags, -t <t1,t2>  Comma-separated tags
                 \\
                 \\EXAMPLES:
                 \\    mind add "Fix login bug"
@@ -88,14 +88,14 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Edit an existing todo (alias: update)
                 \\
                 \\USAGE:
-                \\    mind edit <id> [--title <text>] [--body <text>] [--status <s>] [--tags <t1,t2>]
+                \\    mind edit <id> [--title <text>] [--body <text>] [--status <s>] [--tags, -t <t1,t2>]
                 \\    mind update <id> [...]
                 \\
                 \\FLAGS:
                 \\    --title <text>     New title
                 \\    --body <text>      New body text
                 \\    --status <s>       New status: pending, in-progress, done
-                \\    --tags <t1,t2>     Comma-separated tags (replaces existing)
+                \\    --tags, -t <t1,t2>  Comma-separated tags (replaces existing)
                 \\
                 \\At least one field must be specified.
                 \\
