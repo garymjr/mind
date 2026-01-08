@@ -18,8 +18,9 @@ Mind is a Zig-based CLI tool for managing project todos with dependencies and ta
 ## Core Concepts
 
 - **ID**: `{timestamp}-{ms:0>3}` format, auto-generated
-- **Status**: `pending`, `in-progress`, `done`, `blocked`
-- **Dependencies**: `depends_on` (parent tasks) and `blocked_by` (child tasks)
+- **Status**: `pending`, `in-progress`, `done`
+- **Blocked state**: Computed from dependencies (when depends_on tasks aren't done)
+- **Dependencies**: `depends_on` (parent tasks) and `blocked_by` (child tasks, auto-populated)
 - **Tags**: Comma-separated for categorization
 
 ## Common Commands
