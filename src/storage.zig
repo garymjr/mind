@@ -21,7 +21,7 @@ fn escapeJsonString(allocator: std.mem.Allocator, input: []const u8) ![]const u8
                 // Escape control characters U+0000 to U+001F as \uXXXX
                 if (c < 0x20) {
                     try result.appendSlice(allocator, "\\u00");
-                    try std.fmt.formatInt(c, 16, .lower, .{ .width = 2, .fill = '0' }, result.writer(allocator).any());
+                    try std.fmt.format(result.writer(allocator), "{x:0>2}", .{c});
                 } else {
                     try result.append(allocator, c);
                 }
@@ -206,7 +206,7 @@ pub const Storage = struct {
         // Format JSON manually
         const file = try std.fs.cwd().createFile(self.path, .{});
 
-        var write_buf: [4096]u8 = undefined;
+        var write_buf: [65536]u8 = undefined;
         var writer = file.writer(&write_buf);
 
         try writer.interface.writeAll("{\n  \"todos\": [\n");

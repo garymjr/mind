@@ -260,7 +260,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
 }
 
 pub fn printError(_: anytype, comptime fmt: []const u8, args_: anytype) !void {
-    var stderr_buf: [4096]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stderr_writer = std.fs.File.stderr().writer(&stderr_buf);
     try (&stderr_writer.interface).print("error: " ++ fmt ++ "\n", args_);
     try stderr_writer.end();

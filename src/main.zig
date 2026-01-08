@@ -49,7 +49,7 @@ pub fn main() !void {
     if (parsed.command == .help) {
         if (parsed.target) |cmd_str| {
             if (cli.parseCommand(cmd_str)) |cmd| {
-                var buf: [4096]u8 = undefined;
+                var buf: [65536]u8 = undefined;
                 var stderr_writer = std.fs.File.stderr().writer(&buf);
                 defer stderr_writer.end() catch {};
                 try help.printCommandHelp(&stderr_writer, cmd);

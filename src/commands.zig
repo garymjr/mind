@@ -64,8 +64,8 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []co
 }
 
 pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -157,7 +157,7 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 }
 
 pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
 
     var st = storage.Storage.init(allocator, store_path);
@@ -212,7 +212,7 @@ pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []co
 }
 
 pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
 
     var st = storage.Storage.init(allocator, store_path);
@@ -274,8 +274,8 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 }
 
 pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -303,8 +303,8 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 }
 
 pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -415,8 +415,8 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
 }
 
 pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -462,8 +462,8 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 }
 
 pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -515,8 +515,8 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 }
 
 pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -593,8 +593,8 @@ pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 }
 
 pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
-    var stdout_buf: [4096]u8 = undefined;
-    var stderr_buf: [4096]u8 = undefined;
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
     defer stdout.end() catch {};
@@ -650,7 +650,7 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     }
 
     // Shrink to fit (preserves new_deps pointer if possible)
-    const final_deps = try allocator.shrink(new_deps, new_idx);
+    const final_deps = try allocator.realloc(new_deps, new_idx);
 
     // Free old depends_on strings and array
     for (old_deps) |dep| allocator.free(dep);
