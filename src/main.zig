@@ -106,6 +106,7 @@ pub fn main() !void {
         .status => try commands.executeStatus(allocator, cmd_args.status, MIND_FILE),
         .done => try commands.executeDone(allocator, cmd_args.done, MIND_FILE),
         .next => try commands.executeNext(allocator, cmd_args.next, MIND_FILE),
+        .search => try commands.executeSearch(allocator, cmd_args.search, MIND_FILE),
         .delete => try commands.executeDelete(allocator, cmd_args.delete, MIND_FILE),
         .tag => try commands.executeTag(allocator, cmd_args.tag, MIND_FILE),
         .untag => try commands.executeUntag(allocator, cmd_args.untag, MIND_FILE),
@@ -131,6 +132,7 @@ const HELP_TEXT =
     \\    status                   Show project status summary
     \\    done <id>                Mark todo as done
     \\    next                     Show next unblocked todo
+    \\    search <query>           Search todos by query
     \\    tag <id> <tag>           Add tag to todo
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
@@ -148,6 +150,8 @@ const HELP_TEXT =
     \\    mind edit 1234567890-001 --status in-progress
     \\    mind list --status pending
     \\    mind list --tag feature
+    \\    mind search "auth"
+    \\    mind search --tag frontend "auth"
     \\    mind show 1234567890-001
     \\    mind status
     \\    mind done 1234567890-001 --reason "Completed API integration"

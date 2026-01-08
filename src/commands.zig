@@ -321,6 +321,112 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli_args.List.Args, store
     try stdout.end();
 }
 
+pub fn executeSearch(allocator: std.mem.Allocator, args: cli_args.Search.Args, store_path: []const u8) !void {
+    var stdout_buf: [65536]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    errdefer stdout.end() catch {};
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    // Normalize query for case-insensitive search
+    const query_lower = if (args.query) |q| blk: {
+        const lower = try allocator.alloc(u8, q.len);
+        for (q, 0..) |c, i| {
+            lower[i] = std.ascii.toLower(c);
+        }
+        break :blk lower;
+    } else null;
+    defer if (query_lower) |q| allocator.free(q);
+
+    // Normalize tag filter if present
+    const normalized_tag_filter = if (args.tag_filter) |filter_tag|
+        try util.normalizeNfc(allocator, filter_tag)
+    else
+        null;
+    defer if (normalized_tag_filter) |tag| allocator.free(tag);
+
+    // Build filtered list
+    var filtered = std.ArrayListUnmanaged(*const todo.Todo){};
+    defer filtered.deinit(allocator);
+
+    for (todo_list.todos) |*item| {
+        // Apply query filter (case-insensitive substring search)
+        if (query_lower) |q| {
+            var query_found = false;
+
+            // Search in title
+            var title_lower = std.ArrayListUnmanaged(u8){};
+            defer title_lower.deinit(allocator);
+            try title_lower.ensureTotalCapacity(allocator, item.title.len);
+            for (item.title) |c| {
+                try title_lower.append(allocator, std.ascii.toLower(c));
+            }
+
+            if (std.mem.indexOf(u8, title_lower.items, q) != null) {
+                query_found = true;
+            }
+
+            // Search in body if not found in title
+            if (!query_found and item.body.len > 0) {
+                var body_lower = std.ArrayListUnmanaged(u8){};
+                defer body_lower.deinit(allocator);
+                try body_lower.ensureTotalCapacity(allocator, item.body.len);
+                for (item.body) |c| {
+                    try body_lower.append(allocator, std.ascii.toLower(c));
+                }
+
+                if (std.mem.indexOf(u8, body_lower.items, q) != null) {
+                    query_found = true;
+                }
+            }
+
+            if (!query_found) continue;
+        }
+
+        // Apply tag filter (tags are already normalized in storage)
+        if (normalized_tag_filter) |filter_tag| {
+            var has_tag = false;
+            for (item.tags) |tag| {
+                if (std.mem.eql(u8, tag, filter_tag)) {
+                    has_tag = true;
+                    break;
+                }
+            }
+            if (!has_tag) continue;
+        }
+
+        try filtered.append(allocator, item);
+    }
+
+    if (args.json) {
+        // Convert back to Todo[] for JSON output
+        var todos_for_json = try allocator.alloc(todo.Todo, filtered.items.len);
+        defer {
+            for (todos_for_json) |_| {
+                // Don't free - these are borrowed from todo_list
+            }
+            allocator.free(todos_for_json);
+        }
+        for (filtered.items, 0..) |item, i| {
+            todos_for_json[i] = item.*;
+        }
+        try outputJson(&stdout, allocator, todos_for_json);
+    } else {
+        // Dereference pointers for outputList
+        var todos_output = try allocator.alloc(todo.Todo, filtered.items.len);
+        defer allocator.free(todos_output);
+        for (filtered.items, 0..) |item, i| {
+            todos_output[i] = item.*;
+        }
+        try outputList(&stdout, todos_output);
+    }
+
+    // Flush the buffer
+    try stdout.end();
+}
+
 pub fn executeShow(allocator: std.mem.Allocator, args: cli_args.Show.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stderr_buf: [65536]u8 = undefined;

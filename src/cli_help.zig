@@ -16,6 +16,7 @@ const HELP_TEXT: []const u8 =
     \\    status                   Show project status summary
     \\    done <id>                Mark todo as done
     \\    next                     Show next unblocked todo
+    \\    search <query>           Search todos by query
     \\    tag <id> <tag>           Add tag to todo
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
@@ -207,6 +208,29 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind next
                 \\    mind next --all
                 \\    mind next --json
+                \\
+                \\
+            );
+        },
+        .search => {
+            try writer.interface.writeAll(
+                \\Search todos
+                \\
+                \\USAGE:
+                \\    mind search <query> [--tag <tag>] [--json]
+                \\
+                \\FLAGS:
+                \\    --tag <tag>        Filter by tag in addition to query
+                \\    --json             Output as JSON
+                \\
+                \\Performs case-insensitive substring search across todo titles and bodies.
+                \\Combined with --tag for refined results.
+                \\
+                \\EXAMPLES:
+                \\    mind search "auth"
+                \\    mind search "API"
+                \\    mind search --tag frontend "auth"
+                \\    mind search "bug" --json
                 \\
                 \\
             );

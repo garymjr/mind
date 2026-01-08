@@ -17,6 +17,7 @@ pub const Command = enum {
     status,
     done,
     next,
+    search,
     tag,
     untag,
     link,
@@ -36,6 +37,7 @@ pub const CommandArgs = union(Command) {
     status: cli_args.Status.Args,
     done: cli_args.Done.Args,
     next: cli_args.Next.Args,
+    search: cli_args.Search.Args,
     tag: cli_args.Tag.Args,
     untag: cli_args.Untag.Args,
     link: cli_args.Link.Args,
@@ -60,6 +62,7 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "status")) return .status;
     if (std.mem.eql(u8, str, "done")) return .done;
     if (std.mem.eql(u8, str, "next")) return .next;
+    if (std.mem.eql(u8, str, "search")) return .search;
     if (std.mem.eql(u8, str, "tag")) return .tag;
     if (std.mem.eql(u8, str, "untag")) return .untag;
     if (std.mem.eql(u8, str, "link")) return .link;
@@ -101,6 +104,7 @@ pub fn parseCommandArgs(command: Command, args: []const []const u8) !CommandArgs
         .status => CommandArgs{ .status = try cli_args.Status.parse(cmd_args) },
         .done => CommandArgs{ .done = try cli_args.Done.parse(cmd_args) },
         .next => CommandArgs{ .next = try cli_args.Next.parse(cmd_args) },
+        .search => CommandArgs{ .search = try cli_args.Search.parse(cmd_args) },
         .tag => CommandArgs{ .tag = try cli_args.Tag.parse(cmd_args) },
         .untag => CommandArgs{ .untag = try cli_args.Untag.parse(cmd_args) },
         .link => CommandArgs{ .link = try cli_args.Link.parse(cmd_args) },
