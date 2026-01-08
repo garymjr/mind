@@ -16,7 +16,7 @@ install:
 test:
     zig build test
 
-# Run tests for a specific file
+# Run tests for a specific file (use filename without path/extension, e.g., "todo")
 test-file file:
     zig test src/{{file}}.zig
 
