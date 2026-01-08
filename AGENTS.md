@@ -92,6 +92,15 @@ src/
 4. Implement `execute<CommandName>()` in commands.zig
 5. Add case to main.zig switch
 6. Add help text to cli_help.zig
+7. **Update `skill/mind/SKILL.md`** with new command/workflow documentation
+
+## Documentation Updates
+
+When adding new commands, workflows, or common command patterns, **always update `skill/mind/SKILL.md`**:
+- Add command to appropriate section (Common Commands, Viewing Tasks, etc.)
+- Document usage examples with realistic scenarios
+- Add workflow patterns to Workflows section if applicable
+- Keep examples copy-pasteable and accurate
 
 ## Unimplemented Commands
 
