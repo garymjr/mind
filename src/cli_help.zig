@@ -28,12 +28,14 @@ const HELP_TEXT: []const u8 =
     \\    --quiet                  Output only the todo ID (for 'add')
     \\    --title <text>           Set title (for 'edit')
     \\    --body <text>            Set body text (for 'add', 'edit')
+    \\    --priority <p>           Set/filter priority: low, medium, high, critical
     \\    --tags, -t <t1,t2>       Set tags comma-separated (for 'add', 'edit')
     \\    --status, -s <s>         Set/filter by status: pending, in-progress, done
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
     \\    --unblocked              Show only unblocked todos
     \\    --all                    Show all unblocked todos (for 'next')
+    \\    --sort <field>           Sort by: priority, priority-asc (for 'list')
     \\    --reason <text>          Set resolution reason (for 'done')
     \\    --force                  Delete with dependencies (for 'delete')
     \\    --yes                    Skip confirmation prompts
@@ -77,13 +79,15 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind add <title> [FLAGS]
                 \\
                 \\FLAGS:
-                \\    --quiet             Output only the todo ID
-                \\    --body <text>      Optional body text (adds context)
-                \\    --tags, -t <t1,t2>  Comma-separated tags
+                \\    --quiet                Output only the todo ID
+                \\    --body <text>         Optional body text (adds context)
+                \\    --priority <p>        Priority: low, medium, high, critical (default: medium)
+                \\    --tags, -t <t1,t2>     Comma-separated tags
                 \\
                 \\EXAMPLES:
                 \\    mind add "Fix login bug"
                 \\    mind add "Write docs" --body "Document the API endpoints" --tags "docs,urgent"
+                \\    mind add "Critical issue" --priority critical
                 \\    mind add "Quick task" --quiet  # Output only: 1736205028-001
                 \\
                 \\
@@ -94,14 +98,15 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Edit an existing todo (alias: update)
                 \\
                 \\USAGE:
-                \\    mind edit <id> [--title <text>] [--body <text>] [--status, -s <s>] [--tags, -t <t1,t2>]
+                \\    mind edit <id> [--title <text>] [--body <text>] [--status, -s <s>] [--priority <p>] [--tags, -t <t1,t2>]
                 \\    mind update <id> [...]
                 \\
                 \\FLAGS:
-                \\    --title <text>     New title
-                \\    --body <text>      New body text
-                \\    --status, -s <s>   New status: pending, in-progress, done
-                \\    --tags, -t <t1,t2>  Comma-separated tags (replaces existing)
+                \\    --title <text>       New title
+                \\    --body <text>        New body text
+                \\    --status, -s <s>     New status: pending, in-progress, done
+                \\    --priority <p>       New priority: low, medium, high, critical
+                \\    --tags, -t <t1,t2>   Comma-separated tags (replaces existing)
                 \\
                 \\At least one field must be specified.
                 \\
@@ -109,6 +114,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind edit 1736205028-001 --title "Updated title"
                 \\    mind update 1736205028-001 --status in-progress
                 \\    mind edit 1736205028-001 --body "More details"
+                \\    mind edit 1736205028-001 --priority high
                 \\    mind update 1736205028-001 --tags "bug,urgent"
                 \\
                 \\
@@ -122,16 +128,20 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind list [FLAGS]
                 \\
                 \\FLAGS:
-                \\    --status, -s <s>   Filter: pending, in-progress, done
-                \\    --tag <tag>        Filter by tag
-                \\    --blocked          Show only blocked todos
-                \\    --unblocked        Show only unblocked todos
-                \\    --json             Output as JSON
+                \\    --status, -s <s>       Filter: pending, in-progress, done
+                \\    --priority <p>         Filter: low, medium, high, critical
+                \\    --tag <tag>            Filter by tag
+                \\    --blocked              Show only blocked todos
+                \\    --unblocked            Show only unblocked todos
+                \\    --sort <field>         Sort by: priority, priority-asc
+                \\    --json                 Output as JSON
                 \\
                 \\EXAMPLES:
                 \\    mind list
                 \\    mind list --status pending
+                \\    mind list --priority critical
                 \\    mind list --tag feature --json
+                \\    mind list --sort priority
                 \\
                 \\
             );

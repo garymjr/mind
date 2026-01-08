@@ -68,6 +68,7 @@ src/
     "title": "...",
     "body": "...",
     "status": "pending",
+    "priority": "medium",
     "tags": ["tag"],
     "depends_on": ["parent-id"],
     "blocked_by": ["child-id"],

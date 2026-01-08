@@ -2,18 +2,22 @@ const std = @import("std");
 
 pub const Args = struct {
     status: ?[]const u8 = null,
+    priority: ?[]const u8 = null,
     tag_filter: ?[]const u8 = null,
     blocked_only: bool = false,
     unblocked_only: bool = false,
+    sort: ?[]const u8 = null,
     json: bool = false,
 };
 
 const FLAGS = struct {
     const STATUS = "--status";
     const SHORT_STATUS = "-s";
+    const PRIORITY = "--priority";
     const TAG = "--tag";
     const BLOCKED = "--blocked";
     const UNBLOCKED = "--unblocked";
+    const SORT = "--sort";
     const JSON = "--json";
     const HELP = "--help";
     const SHORT_HELP = "-h";
@@ -39,6 +43,14 @@ pub fn parse(args: []const []const u8) !Args {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, FLAGS.PRIORITY)) {
+            i += 1;
+            if (i >= args.len) return error.MissingValueForFlag;
+            result.priority = args[i];
+            i += 1;
+            continue;
+        }
+
         if (std.mem.eql(u8, arg, FLAGS.TAG)) {
             i += 1;
             if (i >= args.len) return error.MissingValueForFlag;
@@ -55,6 +67,14 @@ pub fn parse(args: []const []const u8) !Args {
 
         if (std.mem.eql(u8, arg, FLAGS.UNBLOCKED)) {
             result.unblocked_only = true;
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, FLAGS.SORT)) {
+            i += 1;
+            if (i >= args.len) return error.MissingValueForFlag;
+            result.sort = args[i];
             i += 1;
             continue;
         }

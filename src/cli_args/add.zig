@@ -3,12 +3,14 @@ const std = @import("std");
 pub const Args = struct {
     title: []const u8,
     body: ?[]const u8 = null,
+    priority: ?[]const u8 = null,
     tags: ?[]const u8 = null,
     quiet: bool = false,
 };
 
 const FLAGS = struct {
     const BODY = "--body";
+    const PRIORITY = "--priority";
     const TAGS = "--tags";
     const SHORT_TAGS = "-t";
     const QUIET = "--quiet";
@@ -41,6 +43,14 @@ pub fn parse(args: []const []const u8) !Args {
             i += 1;
             if (i >= args.len) return error.MissingValueForFlag;
             result.body = args[i];
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, FLAGS.PRIORITY)) {
+            i += 1;
+            if (i >= args.len) return error.MissingValueForFlag;
+            result.priority = args[i];
             i += 1;
             continue;
         }

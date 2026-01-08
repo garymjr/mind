@@ -19,6 +19,7 @@ Mind is a Zig-based CLI tool for managing project todos with dependencies and ta
 
 - **ID**: `{timestamp}-{ms:0>3}` format, auto-generated
 - **Status**: `pending`, `in-progress`, `done`, `blocked`
+- **Priority**: `low`, `medium`, `high`, `critical` (default: medium)
 - **Dependencies**: `depends_on` (parent tasks) and `blocked_by` (child tasks)
 - **Tags**: Comma-separated for categorization
 
@@ -27,8 +28,9 @@ Mind is a Zig-based CLI tool for managing project todos with dependencies and ta
 ### Adding Tasks
 
 ```bash
-mind add "Implement feature"          # Simple todo
+mind add "Implement feature"          # Simple todo (priority: medium)
 mind add "Fix bug" --tags "bug,urgent" # With tags
+mind add "Critical issue" --priority critical  # With priority
 mind add "Task with details" --body "Description here" --tags "frontend"
 mind add "Quick task" --quiet         # Output only the ID (for scripting)
 ```
@@ -48,11 +50,32 @@ mind edit $ID --status in-progress
 ```bash
 mind list                              # List all
 mind list --status pending             # Filter by status
+mind list --priority critical          # Filter by priority
 mind list --tag bug                    # Filter by tag
+mind list --sort priority             # Sort by priority (critical first)
+mind search "query"                    # Search by text (title/body)
+mind search --tag frontend "auth"      # Combined filters
 mind show <id>                         # Show details
 mind status                            # Show project status summary
 mind next                              # Show next ready task
 ```
+
+#### Search
+
+Search performs case-insensitive substring matching across titles and bodies:
+
+```bash
+mind search "auth"                     # Find todos containing "auth"
+mind search "API"                      # Find API-related todos
+mind search --tag frontend "auth"      # Search with tag filter
+mind search "bug" --json               # Search with JSON output
+```
+
+**Use cases:**
+- Finding related tasks by keyword
+- Locating bugs by description
+- Filtering by topic + tag combination
+- Quick discovery without remembering IDs
 
 #### JSON Output
 
@@ -60,6 +83,7 @@ Most viewing commands support `--json` for programmatic access:
 
 ```bash
 mind list --json                       # JSON array of todos
+mind search "query" --json             # Search results as JSON
 mind show <id> --json                  # Single todo as JSON
 mind status --json                     # Status summary as JSON
 mind next --json                       # Unblocked todos as JSON
@@ -72,6 +96,7 @@ mind done <id> --json                  # Mark done, return result as JSON
 mind edit <id> --title "New title"              # Update title
 mind edit <id> --body "More details"             # Update body
 mind edit <id> --status in-progress              # Update status
+mind edit <id> --priority high                  # Update priority
 mind edit <id> --tags "priority,urgent"          # Replace all tags
 mind tag <id> <tag>                              # Add a single tag
 mind untag <id> <tag>                            # Remove a single tag
@@ -114,11 +139,12 @@ mind show <id>                         # Shows depends_on and blocked_by
 ## Best Practices
 
 1. **Granular tasks**: Break down work into small, completable items
-2. **Use tags**: Organize by area, priority, type (e.g., `frontend`, `urgent`, `bug`)
-3. **Set dependencies**: Clearly define what blocks what
-4. **Update status**: Mark `in-progress` when starting, `done` when complete
-5. **Clear titles**: Keep titles under 100 chars, descriptive
-6. **Use body**: Add details, acceptance criteria, notes
+2. **Use tags**: Organize by area, type (e.g., `frontend`, `bug`)
+3. **Set priorities**: Use `priority` field for importance (`--priority critical` for blockers)
+4. **Set dependencies**: Clearly define what blocks what
+5. **Update status**: Mark `in-progress` when starting, `done` when complete
+6. **Clear titles**: Keep titles under 100 chars, descriptive
+7. **Use body**: Add details, acceptance criteria, notes
 
 ## Unicode Normalization
 
@@ -235,7 +261,8 @@ just check             # Build + test
     {
       "id": "1736205028-001",
       "title": "Task name",
-      "status": "pending"
+      "status": "pending",
+      "priority": "high"
     }
   ],
   "count": 1
@@ -263,6 +290,7 @@ Data stored in `.mind/mind.json`:
     "title": "...",
     "body": "...",
     "status": "pending",
+    "priority": "medium",
     "tags": ["tag"],
     "depends_on": ["parent-id"],
     "blocked_by": ["child-id"],

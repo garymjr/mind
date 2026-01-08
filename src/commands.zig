@@ -35,10 +35,14 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli_args.Add.Args, store_p
 
     const body = args.body orelse "";
 
+    // Parse priority
+    const priority = if (args.priority) |p| todo.Priority.fromString(p) orelse .medium else .medium;
+
     const new_todo = try todo.createTodo(
         allocator,
         args.title,
         body,
+        priority,
         tags_list.items,
         &.{},
     );
@@ -122,6 +126,16 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli_args.Edit.Args, store
             return error.InvalidStatus;
         };
         todo_list.todos[idx].status = new_status;
+        modified = true;
+    }
+
+    // Update priority
+    if (args.priority) |priority_str| {
+        const new_priority = todo.Priority.fromString(priority_str) orelse {
+            try cli.printError(stderr, "invalid priority: {s} (must be: low, medium, high, critical)", .{priority_str});
+            return error.InvalidPriority;
+        };
+        todo_list.todos[idx].priority = new_priority;
         modified = true;
     }
 
@@ -272,6 +286,14 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli_args.List.Args, store
             }
         }
 
+        // Apply priority filter
+        if (args.priority) |priority_str| {
+            const filter_priority = todo.Priority.fromString(priority_str);
+            if (filter_priority) |p| {
+                if (item.priority != p) continue;
+            }
+        }
+
         // Apply tag filter (tags are already normalized in storage)
         if (normalized_tag_filter) |filter_tag| {
             var has_tag = false;
@@ -285,6 +307,25 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli_args.List.Args, store
         }
 
         try filtered.append(allocator, item);
+    }
+
+    // Sort by priority if requested
+    if (args.sort) |sort_by| {
+        if (std.mem.eql(u8, sort_by, "priority")) {
+            // Sort by priority (critical first, then high, medium, low)
+            std.sort.insertion(*const todo.Todo, filtered.items, {}, struct {
+                fn lessThan(_: void, a: *const todo.Todo, b: *const todo.Todo) bool {
+                    return @intFromEnum(a.priority) > @intFromEnum(b.priority);
+                }
+            }.lessThan);
+        } else if (std.mem.eql(u8, sort_by, "priority-asc")) {
+            // Sort by priority ascending (low first)
+            std.sort.insertion(*const todo.Todo, filtered.items, {}, struct {
+                fn lessThan(_: void, a: *const todo.Todo, b: *const todo.Todo) bool {
+                    return @intFromEnum(a.priority) < @intFromEnum(b.priority);
+                }
+            }.lessThan);
+        }
     }
 
     // Convert to slice for output functions
@@ -756,7 +797,8 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli_args.Next.Args, store
             try stdout.interface.writeAll("      \"title\": \"");
             try util.writeEscapedStringToWriter(&stdout.interface, item.title);
             try stdout.interface.writeAll("\",\n");
-            try stdout.interface.print("      \"status\": \"{s}\"\n", .{item.status.toString()});
+            try stdout.interface.print("      \"status\": \"{s}\",\n", .{item.status.toString()});
+            try stdout.interface.print("      \"priority\": \"{s}\"\n", .{item.priority.toString()});
             try stdout.interface.writeAll("    }");
         }
         try stdout.interface.writeAll("\n  ],\n  \"count\": ");
@@ -765,7 +807,8 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli_args.Next.Args, store
     } else if (args.all) {
         try stdout.interface.writeAll("Unblocked todos:\n");
         for (unblocked.items) |item| {
-            try stdout.interface.print("  {s} {s:<12} {s}\n", .{ item.id, item.status.toString(), item.title });
+            const priority_symbol = item.priority.toSymbol();
+            try stdout.interface.print("  {s} {s} {s:<12} {s}\n", .{ priority_symbol, item.id, item.status.toString(), item.title });
         }
     } else {
         const next_todo = unblocked.items[0];
@@ -1121,9 +1164,10 @@ fn outputList(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
 
     for (todos) |item| {
         const status_str = item.status.toString();
+        const priority_symbol = item.priority.toSymbol();
         const title_trunc = if (item.title.len > 40) item.title[0..40] ++ "..." else item.title;
 
-        try w.print("{s} {s:<12} {s}\n", .{ item.id, status_str, title_trunc });
+        try w.print("{s} {s} {s:<12} {s}\n", .{ priority_symbol, item.id, status_str, title_trunc });
     }
 }
 
@@ -1132,6 +1176,7 @@ fn outputTodoDetail(writer: *std.fs.File.Writer, item: todo.Todo, todo_list: *co
 
     try w.print("ID: {s}\n", .{item.id});
     try w.print("Status: {s}\n", .{item.status.toString()});
+    try w.print("Priority: {s}\n", .{item.priority.toString()});
     try w.print("Title: {s}\n", .{item.title});
 
     if (item.body.len > 0) {

@@ -391,6 +391,7 @@ pub fn writeEscapedStringToWriter(writer: anytype, input: []const u8) !void {
 pub fn writeTodoJson(writer: anytype, allocator: std.mem.Allocator, item: todo.Todo) !void {
     _ = allocator; // Unused after optimization
     const status_str = item.status.toString();
+    const priority_str = item.priority.toString();
 
     try writer.writeAll("    {\n");
     try writer.writeAll("      \"id\": \"");
@@ -406,6 +407,8 @@ pub fn writeTodoJson(writer: anytype, allocator: std.mem.Allocator, item: todo.T
     try writer.writeAll("\",\n");
 
     try writer.print("      \"status\": \"{s}\",\n", .{status_str});
+
+    try writer.print("      \"priority\": \"{s}\",\n", .{priority_str});
 
     try writer.writeAll("      \"tags\": [");
     for (item.tags, 0..) |tag, j| {

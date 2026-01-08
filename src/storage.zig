@@ -107,6 +107,13 @@ pub const Storage = struct {
             };
             const status = todo.Status.fromString(status_str) orelse .pending;
 
+            const priority_value = item_obj.get("priority") orelse std.json.Value{ .string = "medium" };
+            const priority_str = switch (priority_value) {
+                .string => |s| s,
+                else => "medium",
+            };
+            const priority = todo.Priority.fromString(priority_str) orelse .medium;
+
             const tags_value = item_obj.get("tags") orelse {
                 std.debug.print("Error: Todo at index {d} missing required 'tags' field\n", .{idx});
                 return error.InvalidFormat;
@@ -221,6 +228,7 @@ pub const Storage = struct {
                 .title = title,
                 .body = body,
                 .status = status,
+                .priority = priority,
                 .tags = tags_slice,
                 .depends_on = depends_slice,
                 .blocked_by = blocked_slice,

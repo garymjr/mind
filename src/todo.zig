@@ -26,11 +26,49 @@ pub const Status = enum(u8) {
     }
 };
 
+pub const Priority = enum(u8) {
+    low,
+    medium,
+    high,
+    critical,
+
+    pub fn fromString(str: []const u8) ?Priority {
+        if (std.mem.eql(u8, str, "low")) return .low;
+        if (std.mem.eql(u8, str, "medium")) return .medium;
+        if (std.mem.eql(u8, str, "high")) return .high;
+        if (std.mem.eql(u8, str, "critical")) return .critical;
+        return null;
+    }
+
+    pub fn toString(self: Priority) []const u8 {
+        return switch (self) {
+            .low => "low",
+            .medium => "medium",
+            .high => "high",
+            .critical => "critical",
+        };
+    }
+
+    pub fn toSymbol(self: Priority) []const u8 {
+        return switch (self) {
+            .low => "○",
+            .medium => "◔",
+            .high => "◑",
+            .critical => "●",
+        };
+    }
+
+    pub fn format(self: Priority, comptime fmt: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(fmt, .{self.toString()});
+    }
+};
+
 pub const Todo = struct {
     id: []const u8,
     title: []const u8,
     body: []const u8,
     status: Status,
+    priority: Priority,
     tags: []const []const u8,
     depends_on: []const []const u8,
     blocked_by: []const []const u8,
@@ -175,6 +213,7 @@ pub fn createTodo(
     allocator: std.mem.Allocator,
     title: []const u8,
     body: []const u8,
+    priority: Priority,
     tags: []const []const u8,
     depends_on: []const []const u8,
 ) !Todo {
@@ -220,6 +259,7 @@ pub fn createTodo(
         .title = title_copy,
         .body = body_copy,
         .status = .pending,
+        .priority = priority,
         .tags = tags_copy,
         .depends_on = depends_copy,
         .blocked_by = try allocator.alloc([]const u8, 0),
@@ -232,12 +272,34 @@ pub fn createTodo(
 test "createTodo validates title length" {
     const allocator = std.testing.allocator;
     const long_title = "a" ** 101;
-    const result = createTodo(allocator, long_title, "", &.{}, &.{});
+    const result = createTodo(allocator, long_title, "", .medium, &.{}, &.{});
     try std.testing.expectError(error.TitleTooLong, result);
 }
 
 test "createTodo rejects empty title" {
     const allocator = std.testing.allocator;
-    const result = createTodo(allocator, "", "", &.{}, &.{});
+    const result = createTodo(allocator, "", "", .medium, &.{}, &.{});
     try std.testing.expectError(error.TitleEmpty, result);
+}
+
+test "Priority fromString" {
+    try std.testing.expectEqual(Priority.low, Priority.fromString("low"));
+    try std.testing.expectEqual(Priority.medium, Priority.fromString("medium"));
+    try std.testing.expectEqual(Priority.high, Priority.fromString("high"));
+    try std.testing.expectEqual(Priority.critical, Priority.fromString("critical"));
+    try std.testing.expectEqual(@as(?Priority, null), Priority.fromString("invalid"));
+}
+
+test "Priority toString" {
+    try std.testing.expectEqualStrings("low", Priority.low.toString());
+    try std.testing.expectEqualStrings("medium", Priority.medium.toString());
+    try std.testing.expectEqualStrings("high", Priority.high.toString());
+    try std.testing.expectEqualStrings("critical", Priority.critical.toString());
+}
+
+test "Priority toSymbol" {
+    try std.testing.expectEqualStrings("○", Priority.low.toSymbol());
+    try std.testing.expectEqualStrings("◔", Priority.medium.toSymbol());
+    try std.testing.expectEqualStrings("◑", Priority.high.toSymbol());
+    try std.testing.expectEqualStrings("●", Priority.critical.toSymbol());
 }

@@ -5,6 +5,7 @@ pub const Args = struct {
     title: ?[]const u8 = null,
     body: ?[]const u8 = null,
     status: ?[]const u8 = null,
+    priority: ?[]const u8 = null,
     tags: ?[]const u8 = null,
 };
 
@@ -15,6 +16,7 @@ const FLAGS = struct {
     const SHORT_TAGS = "-t";
     const STATUS = "--status";
     const SHORT_STATUS = "-s";
+    const PRIORITY = "--priority";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -66,6 +68,14 @@ pub fn parse(args: []const []const u8) !Args {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, FLAGS.PRIORITY)) {
+            i += 1;
+            if (i >= args.len) return error.MissingValueForFlag;
+            result.priority = args[i];
+            i += 1;
+            continue;
+        }
+
         // Not a flag, must be positional (id)
         if (isFlag(arg)) {
             return error.UnknownFlag;
@@ -83,7 +93,7 @@ pub fn parse(args: []const []const u8) !Args {
     if (!id_set) return error.MissingId;
 
     // At least one field must be specified to edit
-    if (result.title == null and result.body == null and result.status == null and result.tags == null) {
+    if (result.title == null and result.body == null and result.status == null and result.priority == null and result.tags == null) {
         return error.MissingEditField;
     }
 
