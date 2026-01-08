@@ -13,6 +13,7 @@ pub const Command = enum {
     edit,
     list,
     show,
+    status,
     done,
     next,
     tag,
@@ -202,6 +203,7 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "update")) return .edit;
     if (std.mem.eql(u8, str, "list")) return .list;
     if (std.mem.eql(u8, str, "show")) return .show;
+    if (std.mem.eql(u8, str, "status")) return .status;
     if (std.mem.eql(u8, str, "done")) return .done;
     if (std.mem.eql(u8, str, "next")) return .next;
     if (std.mem.eql(u8, str, "tag")) return .tag;

@@ -13,6 +13,7 @@ const HELP_TEXT: []const u8 =
     \\    edit, update <id>        Edit an existing todo
     \\    list                     List all todos
     \\    show <id>                Show todo details
+    \\    status                   Show project status summary
     \\    done <id>                Mark todo as done
     \\    next                     Show next unblocked todo
     \\    tag <id> <tag>           Add tag to todo
@@ -42,6 +43,7 @@ const HELP_TEXT: []const u8 =
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind show 1234567890-001
+    \\    mind status
     \\    mind done 1234567890-001 --reason "Completed API integration"
     \\    mind next
     \\    mind next --all
@@ -140,6 +142,21 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
                 \\EXAMPLES:
                 \\    mind show 1736205028-001
+                \\
+                \\
+            );
+        },
+        .status => {
+            try writer.interface.writeAll(
+                \\Show project status summary
+                \\
+                \\USAGE:
+                \\    mind status
+                \\
+                \\Displays a summary of all todos grouped by status and blocking state.
+                \\
+                \\EXAMPLES:
+                \\    mind status
                 \\
                 \\
             );

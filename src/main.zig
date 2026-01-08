@@ -77,6 +77,7 @@ pub fn main() !void {
         .edit => try commands.executeEdit(allocator, parsed, MIND_FILE),
         .list => try commands.executeList(allocator, parsed, MIND_FILE),
         .show => try commands.executeShow(allocator, parsed, MIND_FILE),
+        .status => try commands.executeStatus(allocator, parsed, MIND_FILE),
         .done => try commands.executeDone(allocator, parsed, MIND_FILE),
         .next => try commands.executeNext(allocator, parsed, MIND_FILE),
         .delete => try commands.executeDelete(allocator, parsed, MIND_FILE),
@@ -106,6 +107,7 @@ const HELP_TEXT =
     \\    edit, update <id>        Edit an existing todo
     \\    list                     List all todos
     \\    show <id>                Show todo details
+    \\    status                   Show project status summary
     \\    done <id>                Mark todo as done
     \\    next                     Show next unblocked todo
     \\    tag <id> <tag>           Add tag to todo
@@ -136,6 +138,7 @@ const HELP_TEXT =
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind show 1234567890-001
+    \\    mind status
     \\    mind done 1234567890-001 --reason "Completed API integration"
     \\    mind next
     \\    mind next --all

@@ -156,6 +156,61 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     }
 }
 
+pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []const u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    // Count todos by status
+    var pending_count: usize = 0;
+    var in_progress_count: usize = 0;
+    var done_count: usize = 0;
+    var blocked_count: usize = 0;
+    var unblocked_pending: usize = 0;
+
+    for (todo_list.todos) |*item| {
+        switch (item.status) {
+            .pending => {
+                pending_count += 1;
+                if (todo_list.isBlocked(item.*)) {
+                    blocked_count += 1;
+                } else {
+                    unblocked_pending += 1;
+                }
+            },
+            .@"in-progress" => in_progress_count += 1,
+            .done => done_count += 1,
+        }
+    }
+
+    const total = todo_list.todos.len;
+    const w = &stdout.interface;
+
+    try w.writeAll("Project Status\n");
+    try w.writeAll("══════════════\n\n");
+
+    try w.print("Total todos: {d}\n\n", .{total});
+
+    try w.writeAll("By Status:\n");
+    try w.print("  Pending:      {d}\n", .{pending_count});
+    try w.print("  In Progress:  {d}\n", .{in_progress_count});
+    try w.print("  Done:         {d}\n", .{done_count});
+
+    try w.writeAll("\nBlocking State:\n");
+    try w.print("  Blocked:      {d}\n", .{blocked_count});
+    try w.print("  Ready to do:  {d}\n", .{unblocked_pending});
+
+    if (pending_count > 0) {
+        const progress_pct = @as(f64, @floatFromInt(done_count)) / @as(f64, @floatFromInt(total)) * 100.0;
+        try w.print("\nProgress: {d:.1}% complete\n", .{progress_pct});
+    }
+
+    try stdout.end();
+}
+
 pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
     var stdout_buf: [4096]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
