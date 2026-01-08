@@ -271,7 +271,7 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         for (filtered.items, 0..) |item, i| {
             todos_for_json[i] = item.*;
         }
-        try outputJson(&stdout, todos_for_json);
+        try outputJson(&stdout, allocator, todos_for_json);
     } else {
         // Dereference pointers for outputList
         var todos_output = try allocator.alloc(todo.Todo, filtered.items.len);
@@ -309,7 +309,7 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     };
 
     if (args.json) {
-        try outputJson(&stdout, &[_]todo.Todo{item.*});
+        try outputJson(&stdout, allocator, &[_]todo.Todo{item.*});
     } else {
         try outputTodoDetail(&stdout, item.*, &todo_list);
     }
@@ -821,46 +821,6 @@ fn outputTodoDetail(writer: *std.fs.File.Writer, item: todo.Todo, todo_list: *co
     }
 }
 
-fn outputJson(writer: *std.fs.File.Writer, todos: []const todo.Todo) !void {
-    const w = &writer.interface;
-
-    try w.writeAll("{\n  \"todos\": [\n");
-
-    for (todos, 0..) |item, i| {
-        try w.writeAll("    {\n");
-        try w.print("      \"id\": \"{s}\",\n", .{item.id});
-        try w.print("      \"title\": \"{s}\",\n", .{item.title});
-        try w.print("      \"body\": \"{s}\",\n", .{item.body});
-        try w.print("      \"status\": \"{s}\",\n", .{item.status.toString()});
-        
-        try w.writeAll("      \"tags\": [");
-        for (item.tags, 0..) |tag, j| {
-            try w.print("\"{s}\"", .{tag});
-            if (j < item.tags.len - 1) try w.writeAll(", ");
-        }
-        try w.writeAll("],\n");
-
-        try w.writeAll("      \"depends_on\": [");
-        for (item.depends_on, 0..) |dep, j| {
-            try w.print("\"{s}\"", .{dep});
-            if (j < item.depends_on.len - 1) try w.writeAll(", ");
-        }
-        try w.writeAll("],\n");
-
-        try w.writeAll("      \"blocked_by\": [");
-        for (item.blocked_by, 0..) |blocked, j| {
-            try w.print("\"{s}\"", .{blocked});
-            if (j < item.blocked_by.len - 1) try w.writeAll(", ");
-        }
-        try w.writeAll("],\n");
-
-        try w.print("      \"created_at\": \"{s}\",\n", .{item.created_at});
-        try w.print("      \"updated_at\": \"{s}\",\n", .{item.updated_at});
-        try w.print("      \"resolution_reason\": \"{s}\"\n", .{item.resolution_reason});
-        try w.writeAll("    }");
-        if (i < todos.len - 1) try w.writeAll(",");
-        try w.writeAll("\n");
-    }
-
-    try w.writeAll("  ]\n}\n");
+fn outputJson(writer: *std.fs.File.Writer, allocator: std.mem.Allocator, todos: []const todo.Todo) !void {
+    try util.writeTodosJson(&writer.interface, allocator, todos);
 }
