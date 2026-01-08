@@ -259,6 +259,36 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
             );
         },
+        .tag => {
+            try writer.interface.writeAll(
+                \\Add a tag to a todo
+                \\
+                \\USAGE:
+                \\    mind tag <id> <tag>
+                \\
+                \\Tags are normalized to NFC Unicode form, ensuring consistent
+                \\storage and filtering regardless of input representation.
+                \\
+                \\EXAMPLES:
+                \\    mind tag 1736205028-001 urgent
+                \\    mind tag 1736205028-001 frontend
+                \\
+                \\
+            );
+        },
+        .untag => {
+            try writer.interface.writeAll(
+                \\Remove a tag from a todo
+                \\
+                \\USAGE:
+                \\    mind untag <id> <tag>
+                \\
+                \\EXAMPLES:
+                \\    mind untag 1736205028-001 urgent
+                \\
+                \\
+            );
+        },
         else => {
             try writer.interface.writeAll("Command help not yet implemented. Use 'mind --help' for overview.\n");
         },

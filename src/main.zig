@@ -107,15 +107,10 @@ pub fn main() !void {
         .done => try commands.executeDone(allocator, cmd_args.done, MIND_FILE),
         .next => try commands.executeNext(allocator, cmd_args.next, MIND_FILE),
         .delete => try commands.executeDelete(allocator, cmd_args.delete, MIND_FILE),
+        .tag => try commands.executeTag(allocator, cmd_args.tag, MIND_FILE),
+        .untag => try commands.executeUntag(allocator, cmd_args.untag, MIND_FILE),
         .link => try commands.executeLink(allocator, cmd_args.link, MIND_FILE),
         .unlink => try commands.executeUnlink(allocator, cmd_args.unlink, MIND_FILE),
-        .tag, .untag => {
-            const stderr = std.fs.File.stderr();
-            try stderr.writeAll("error: command '");
-            try stderr.writeAll(@tagName(global.command));
-            try stderr.writeAll("' not yet implemented\n");
-            std.process.exit(1);
-        },
         .help, .quickstart, .none => unreachable,
     }
 }

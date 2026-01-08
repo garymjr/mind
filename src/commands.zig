@@ -736,6 +736,137 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli_args.Unlink.Args, s
     try stdout.end();
 }
 
+pub fn executeTag(allocator: std.mem.Allocator, args: cli_args.Tag.Args, store_path: []const u8) !void {
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
+
+    // Validate ID format
+    util.validateId(args.id) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    const idx = todo_list.findIndexById(args.id) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.id});
+        return error.TodoNotFound;
+    };
+
+    // Normalize the tag
+    const normalized_tag = try util.normalizeNfc(allocator, args.tag);
+    defer allocator.free(normalized_tag);
+
+    // Check if tag already exists
+    for (todo_list.todos[idx].tags) |tag| {
+        if (std.mem.eql(u8, tag, normalized_tag)) {
+            try cli.printError(stderr, "todo already has tag: {s}", .{args.tag});
+            return error.TagAlreadyExists;
+        }
+    }
+
+    // Add the tag
+    const old_tags = todo_list.todos[idx].tags;
+    const new_tags = try allocator.alloc([]const u8, old_tags.len + 1);
+    for (old_tags, 0..) |tag, i| {
+        new_tags[i] = tag;
+    }
+    new_tags[old_tags.len] = try allocator.dupe(u8, normalized_tag);
+    todo_list.todos[idx].tags = new_tags;
+    allocator.free(old_tags);
+
+    // Update timestamp
+    allocator.free(todo_list.todos[idx].updated_at);
+    todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+
+    try st.save(&todo_list);
+
+    try stdout.interface.print("Added tag '{s}' to todo: {s}\n", .{ args.tag, args.id });
+    try stdout.end();
+}
+
+pub fn executeUntag(allocator: std.mem.Allocator, args: cli_args.Untag.Args, store_path: []const u8) !void {
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
+
+    // Validate ID format
+    util.validateId(args.id) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    const idx = todo_list.findIndexById(args.id) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.id});
+        return error.TodoNotFound;
+    };
+
+    // Normalize the tag for comparison
+    const normalized_tag = try util.normalizeNfc(allocator, args.tag);
+    defer allocator.free(normalized_tag);
+
+    // Build new tags array excluding the one to remove
+    var tags_list = std.ArrayListUnmanaged([]const u8){};
+    defer {
+        // Only free the array, not the strings (they're borrowed from old_tags)
+        tags_list.deinit(allocator);
+    }
+    try tags_list.ensureTotalCapacity(allocator, todo_list.todos[idx].tags.len);
+
+    var found = false;
+    var removed_tag: ?[]const u8 = null;
+    for (todo_list.todos[idx].tags) |tag| {
+        if (std.mem.eql(u8, tag, normalized_tag)) {
+            found = true;
+            removed_tag = tag; // Save reference to free later
+        } else {
+            try tags_list.append(allocator, tag);
+        }
+    }
+
+    if (!found) {
+        try cli.printError(stderr, "todo does not have tag: {s}", .{args.tag});
+        return error.TagNotFound;
+    }
+
+    // Replace old tags with new array
+    const old_tags = todo_list.todos[idx].tags;
+    var final_tags = try allocator.alloc([]const u8, tags_list.items.len);
+    for (tags_list.items, 0..) |tag, i| {
+        final_tags[i] = tag;
+    }
+
+    // Free the removed tag string and the old tags array (but not the strings we kept)
+    if (removed_tag) |tag| allocator.free(tag);
+    allocator.free(old_tags);
+
+    todo_list.todos[idx].tags = final_tags;
+
+    // Update timestamp
+    allocator.free(todo_list.todos[idx].updated_at);
+    todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+
+    try st.save(&todo_list);
+
+    try stdout.interface.print("Removed tag '{s}' from todo: {s}\n", .{ args.tag, args.id });
+    try stdout.end();
+}
+
 fn wouldCreateCycle(todo_list: *const todo.TodoList, child_id: []const u8, parent_id: []const u8) bool {
     // Check if adding parent_id to child_id would create a cycle
     // This happens if parent_id transitively depends on child_id

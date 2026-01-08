@@ -36,8 +36,8 @@ pub const CommandArgs = union(Command) {
     status: cli_args.Status.Args,
     done: cli_args.Done.Args,
     next: cli_args.Next.Args,
-    tag: void,
-    untag: void,
+    tag: cli_args.Tag.Args,
+    untag: cli_args.Untag.Args,
     link: cli_args.Link.Args,
     unlink: cli_args.Unlink.Args,
     delete: cli_args.Delete.Args,
@@ -101,11 +101,11 @@ pub fn parseCommandArgs(command: Command, args: []const []const u8) !CommandArgs
         .status => CommandArgs{ .status = try cli_args.Status.parse(cmd_args) },
         .done => CommandArgs{ .done = try cli_args.Done.parse(cmd_args) },
         .next => CommandArgs{ .next = try cli_args.Next.parse(cmd_args) },
+        .tag => CommandArgs{ .tag = try cli_args.Tag.parse(cmd_args) },
+        .untag => CommandArgs{ .untag = try cli_args.Untag.parse(cmd_args) },
         .link => CommandArgs{ .link = try cli_args.Link.parse(cmd_args) },
         .unlink => CommandArgs{ .unlink = try cli_args.Unlink.parse(cmd_args) },
         .delete => CommandArgs{ .delete = try cli_args.Delete.parse(cmd_args) },
-        .tag => CommandArgs{ .tag = {} },
-        .untag => CommandArgs{ .untag = {} },
         .help => {
             // help command takes optional command name as positional arg
             if (cmd_args.len > 0) {
@@ -123,6 +123,7 @@ pub fn formatParseError(err: anyerror, _: Command) []const u8 {
     return switch (err) {
         error.MissingTitle => "add requires a title",
         error.MissingId => "command requires a todo ID",
+        error.MissingTag => "command requires a tag",
         error.MissingChildId => "link requires a child todo ID",
         error.MissingParentId => "link requires a parent todo ID",
         error.MissingValueForFlag => "flag requires a value",
