@@ -673,28 +673,43 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
 fn wouldCreateCycle(todo_list: *const todo.TodoList, child_id: []const u8, parent_id: []const u8) bool {
     // Check if adding parent_id to child_id would create a cycle
     // This happens if parent_id transitively depends on child_id
-    var visited = std.StringHashMapUnmanaged(void){};
-    defer visited.deinit(todo_list.allocator);
+    // Uses iterative DFS with ArrayList tracking (no hash overhead)
+    const MAX_DEPTH = 100; // Prevent infinite loops on malformed data
 
-    return hasPath(todo_list, parent_id, child_id, &visited) catch false;
-}
+    var path = std.ArrayListUnmanaged([]const u8){};
+    defer path.deinit(todo_list.allocator);
 
-fn hasPath(todo_list: *const todo.TodoList, from: []const u8, to: []const u8, visited: *std.StringHashMapUnmanaged(void)) !bool {
-    // If we've already visited this node, there's a cycle
-    if (visited.get(from) != null) return false;
+    path.append(todo_list.allocator, parent_id) catch return false;
 
-    try visited.put(todo_list.allocator, from, {});
+    while (path.items.len > 0) {
+        const current = path.items[path.items.len - 1];
+        path.items.len -= 1;
 
-    // Direct dependency found
-    const from_todo = todo_list.findById(from) orelse return false;
+        // Depth limit check (treat very deep graphs as cycle to be safe)
+        if (path.items.len >= MAX_DEPTH) return true;
 
-    for (from_todo.depends_on) |dep_id| {
-        if (std.mem.eql(u8, dep_id, to)) {
-            return true;
+        // Check if current path contains child_id (cycle found)
+        for (path.items) |visited| {
+            if (std.mem.eql(u8, visited, child_id)) return true;
         }
-        // Recursively check
-        if (try hasPath(todo_list, dep_id, to, visited)) {
-            return true;
+
+        // Check if current todo matches child_id
+        if (std.mem.eql(u8, current, child_id)) return true;
+
+        // Check if already in current path (cycle in graph itself)
+        var in_path = false;
+        for (path.items) |visited| {
+            if (std.mem.eql(u8, visited, current)) {
+                in_path = true;
+                break;
+            }
+        }
+        if (in_path) continue;
+
+        // Add dependencies to stack
+        const current_todo = todo_list.findById(current) orelse continue;
+        for (current_todo.depends_on) |dep_id| {
+            path.append(todo_list.allocator, dep_id) catch return false;
         }
     }
 
