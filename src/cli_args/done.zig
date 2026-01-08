@@ -1,7 +1,7 @@
 const std = @import("std");
 
 pub const Args = struct {
-    id: []const u8,
+    ids: []const []const u8,
     reason: ?[]const u8 = null,
 };
 
@@ -13,9 +13,9 @@ const FLAGS = struct {
 
 pub fn parse(args: []const []const u8) !Args {
     var result = Args{
-        .id = undefined,
+        .ids = &[_][]const u8{},
+        .reason = null,
     };
-    var id_set = false;
 
     var i: usize = 0;
     while (i < args.len) {
@@ -39,16 +39,16 @@ pub fn parse(args: []const []const u8) !Args {
             return error.UnknownFlag;
         }
 
-        if (!id_set) {
-            result.id = arg;
-            id_set = true;
-            i += 1;
-        } else {
-            return error.UnexpectedPositional;
-        }
+        // Find the end of positional args (first flag or end of args)
+        var j: usize = i;
+        while (j < args.len and !isFlag(args[j])) : (j += 1) {}
+
+        // Set ids to the slice of positional args
+        result.ids = args[i..j];
+        i = j;
     }
 
-    if (!id_set) return error.MissingId;
+    if (result.ids.len == 0) return error.MissingId;
 
     return result;
 }

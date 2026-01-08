@@ -165,10 +165,10 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
         },
         .done => {
             try writer.interface.writeAll(
-                \\Mark todo as done
+                \\Mark todo(s) as done
                 \\
                 \\USAGE:
-                \\    mind done <id> [--reason <text>]
+                \\    mind done <id> [<id> ...] [--reason <text>]
                 \\
                 \\FLAGS:
                 \\    --reason <text>    Optional reason for completion
@@ -178,6 +178,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\EXAMPLES:
                 \\    mind done 1736205028-001
                 \\    mind done 1736205028-001 --reason "Fixed the memory leak"
+                \\    mind done 1736205028-001 1736205028-002 1736205028-003
                 \\
                 \\
             );

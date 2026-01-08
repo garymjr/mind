@@ -151,6 +151,7 @@ const HELP_TEXT =
     \\    mind show 1234567890-001
     \\    mind status
     \\    mind done 1234567890-001 --reason "Completed API integration"
+    \\    mind done 1234567890-001 1234567890-002 1234567890-003
     \\    mind next
     \\    mind next --all
     \\    mind link 1234567890-002 1234567890-001

@@ -482,44 +482,71 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli_args.Done.Args, store
     errdefer stdout.end() catch {};
     errdefer stderr.end() catch {};
 
-    // Validate ID format
-    util.validateId(args.id) catch |err| {
-        try cli.printError(stderr, "invalid ID format: {s}", .{args.id});
-        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
-        return err;
-    };
+    if (args.ids.len == 0) return error.MissingId;
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
     defer todo_list.deinit();
 
-    const idx = todo_list.findIndexById(args.id) orelse {
-        try cli.printError(stderr, "todo not found: {s}", .{args.id});
-        return error.TodoNotFound;
-    };
+    var marked_count: usize = 0;
+    var error_count: usize = 0;
 
-    // Check if blocked
-    if (todo_list.isBlocked(todo_list.todos[idx])) {
-        try cli.printError(stderr, "cannot mark blocked todo as done. Unblock dependencies first.", .{});
-        return error.TodoBlocked;
+    // Process each ID
+    for (args.ids) |id| {
+        // Validate ID format
+        util.validateId(id) catch {
+            try cli.printError(stderr, "invalid ID format: {s}", .{id});
+            try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+            error_count += 1;
+            continue;
+        };
+
+        const idx = todo_list.findIndexById(id) orelse {
+            try cli.printError(stderr, "todo not found: {s}", .{id});
+            error_count += 1;
+            continue;
+        };
+
+        // Check if blocked
+        if (todo_list.isBlocked(todo_list.todos[idx])) {
+            try cli.printError(stderr, "cannot mark blocked todo as done: {s}", .{id});
+            error_count += 1;
+            continue;
+        }
+
+        // Update status
+        todo_list.todos[idx].status = .done;
+
+        // Update resolution reason if provided
+        if (args.reason) |reason| {
+            allocator.free(todo_list.todos[idx].resolution_reason);
+            todo_list.todos[idx].resolution_reason = try allocator.dupe(u8, reason);
+        }
+
+        // Update timestamp
+        allocator.free(todo_list.todos[idx].updated_at);
+        todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+
+        marked_count += 1;
     }
 
-    // Update status
-    todo_list.todos[idx].status = .done;
-
-    // Update resolution reason if provided
-    if (args.reason) |reason| {
-        allocator.free(todo_list.todos[idx].resolution_reason);
-        todo_list.todos[idx].resolution_reason = try allocator.dupe(u8, reason);
+    // Save only if at least one todo was marked
+    if (marked_count > 0) {
+        try st.save(&todo_list);
     }
 
-    // Update timestamp
-    allocator.free(todo_list.todos[idx].updated_at);
-    todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+    if (marked_count > 0) {
+        if (marked_count == 1) {
+            try stdout.interface.print("Marked {d} todo as done: {s}\n", .{ marked_count, args.ids[0] });
+        } else {
+            try stdout.interface.print("Marked {d} todos as done\n", .{marked_count});
+        }
+    }
 
-    try st.save(&todo_list);
+    if (error_count > 0) {
+        try stdout.interface.print("{d} error(s) occurred\n", .{error_count});
+    }
 
-    try stdout.interface.print("Marked todo as done: {s}\n", .{args.id});
     try stdout.end();
 }
 
