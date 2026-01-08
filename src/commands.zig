@@ -649,8 +649,8 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
         return error.NotLinked;
     }
 
-    // Shrink to fit
-    const final_deps = try allocator.realloc(new_deps, new_idx);
+    // Shrink to fit (preserves new_deps pointer if possible)
+    const final_deps = try allocator.shrink(new_deps, new_idx);
 
     // Free old depends_on strings and array
     for (old_deps) |dep| allocator.free(dep);
