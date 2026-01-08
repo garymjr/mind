@@ -82,6 +82,13 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         return error.MissingId;
     }
 
+    // Validate ID format
+    util.validateId(args.target.?) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+
     // At least one field must be specified to edit
     if (args.title == null and args.body == null and args.status == null and args.tags == null) {
         try cli.printError(stderr, "edit requires at least one field to edit: --title, --body, --status, or --tags", .{});
@@ -299,6 +306,13 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         return error.MissingId;
     }
 
+    // Validate ID format
+    util.validateId(args.target.?) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
     defer todo_list.deinit();
@@ -328,6 +342,13 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
         try cli.printCommandHelp(&stdout, .delete);
         return error.MissingId;
     }
+
+    // Validate ID format
+    util.validateId(args.target.?) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
@@ -473,6 +494,13 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         return error.MissingId;
     }
 
+    // Validate ID format
+    util.validateId(args.target.?) catch |err| {
+        try cli.printError(stderr, "invalid ID format: {s}", .{args.target.?});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
     defer todo_list.deinit();
@@ -582,6 +610,18 @@ pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     const child_id = args.target.?;
     const parent_id = args.parent.?;
 
+    // Validate ID formats
+    util.validateId(child_id) catch |err| {
+        try cli.printError(stderr, "invalid ID format for child: {s}", .{child_id});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+    util.validateId(parent_id) catch |err| {
+        try cli.printError(stderr, "invalid ID format for parent: {s}", .{parent_id});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
     defer todo_list.deinit();
@@ -659,6 +699,18 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
 
     const child_id = args.target.?;
     const parent_id = args.from.?;
+
+    // Validate ID formats
+    util.validateId(child_id) catch |err| {
+        try cli.printError(stderr, "invalid ID format for child: {s}", .{child_id});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
+    util.validateId(parent_id) catch |err| {
+        try cli.printError(stderr, "invalid ID format for parent: {s}", .{parent_id});
+        try cli.printError(stderr, "Expected format: {{timestamp}}-{{ms:0>3}}-{{seq:0>3}}", .{});
+        return err;
+    };
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();

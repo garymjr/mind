@@ -154,6 +154,36 @@ pub fn validateTitle(title: []const u8) error{TitleEmpty, TitleTooLong}!void {
     if (title.len > MAX_TITLE_LENGTH) return error.TitleTooLong;
 }
 
+/// Validates ID format: {timestamp}-{ms:0>3}-{seq:0>3}
+/// Example: "1736205028-001-001"
+pub fn validateId(id: []const u8) error{IdInvalidFormat}!void {
+    // Split into 3 parts by '-'
+    var parts = std.mem.splitScalar(u8, id, '-');
+    const timestamp_part = parts.next() orelse return error.IdInvalidFormat;
+    const ms_part = parts.next() orelse return error.IdInvalidFormat;
+    const seq_part = parts.next() orelse return error.IdInvalidFormat;
+
+    // Should have exactly 3 parts
+    if (parts.next() != null) return error.IdInvalidFormat;
+
+    // Timestamp must be non-empty and all digits
+    if (timestamp_part.len == 0) return error.IdInvalidFormat;
+    for (timestamp_part) |c| {
+        if (c < '0' or c > '9') return error.IdInvalidFormat;
+    }
+
+    // ms and seq must be exactly 3 digits
+    if (ms_part.len != 3) return error.IdInvalidFormat;
+    if (seq_part.len != 3) return error.IdInvalidFormat;
+
+    for (ms_part) |c| {
+        if (c < '0' or c > '9') return error.IdInvalidFormat;
+    }
+    for (seq_part) |c| {
+        if (c < '0' or c > '9') return error.IdInvalidFormat;
+    }
+}
+
 test "validateTitle rejects empty title" {
     try std.testing.expectError(error.TitleEmpty, validateTitle(""));
 }
@@ -167,6 +197,52 @@ test "validateTitle rejects too long title" {
     try std.testing.expectError(error.TitleTooLong, validateTitle(long_title));
 }
 
+test "validateId accepts valid ID" {
+    try validateId("1736205028-001-001");
+}
+
+test "validateId accepts valid ID with leading zeros" {
+    try validateId("1736205028-000-000");
+}
+
+test "validateId rejects empty string" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId(""));
+}
+
+test "validateId rejects ID without dashes" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028001001"));
+}
+
+test "validateId rejects ID with only one dash" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001"));
+}
+
+test "validateId rejects ID with too many dashes" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-001-001"));
+}
+
+test "validateId rejects ID with non-digit timestamp" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("abc-001-001"));
+}
+
+test "validateId rejects ID with non-digit ms" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-abc-001"));
+}
+
+test "validateId rejects ID with non-digit seq" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-abc"));
+}
+
+test "validateId rejects ID with wrong ms length" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-1-001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-00123-001"));
+}
+
+test "validateId rejects ID with wrong seq length" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-1"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-00123"));
+}
+
 test "generateId produces unique IDs" {
     const allocator = std.testing.allocator;
     var ids = std.StringArrayHashMap(void).init(allocator);
@@ -177,7 +253,7 @@ test "generateId produces unique IDs" {
         const id = try generateId(allocator);
         defer allocator.free(id);
 
-        try std.testing.expect(!ids.contains(id), "ID collision detected: {s}", .{id});
+        try std.testing.expect(!ids.contains(id));
         try ids.put(id, {});
     }
 }
