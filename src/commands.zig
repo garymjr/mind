@@ -55,16 +55,21 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli_args.Add.Args, store_p
         return err;
     };
 
-    try stdout.writeAll("Created todo: ");
-    try stdout.writeAll(new_todo.id);
-    try stdout.writeAll("\n  ");
-    try stdout.writeAll(new_todo.title);
-    try stdout.writeAll("\n");
+    if (args.quiet) {
+        try stdout.writeAll(new_todo.id);
+        try stdout.writeAll("\n");
+    } else {
+        try stdout.writeAll("Created todo: ");
+        try stdout.writeAll(new_todo.id);
+        try stdout.writeAll("\n  ");
+        try stdout.writeAll(new_todo.title);
+        try stdout.writeAll("\n");
 
-    if (body.len == 0) {
-        try stdout.writeAll("\n");
-        try stdout.writeAll(BODY_HINT);
-        try stdout.writeAll("\n");
+        if (body.len == 0) {
+            try stdout.writeAll("\n");
+            try stdout.writeAll(BODY_HINT);
+            try stdout.writeAll("\n");
+        }
     }
 }
 

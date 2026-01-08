@@ -30,6 +30,17 @@ Mind is a Zig-based CLI tool for managing project todos with dependencies and ta
 mind add "Implement feature"          # Simple todo
 mind add "Fix bug" --tags "bug,urgent" # With tags
 mind add "Task with details" --body "Description here" --tags "frontend"
+mind add "Quick task" --quiet         # Output only the ID (for scripting)
+```
+
+#### Getting the ID Programmaticaly
+
+Use `--quiet` to get just the ID for capture in scripts:
+
+```bash
+ID=$(mind add "New task" --quiet)
+# $ID now contains: 1736205028-001
+mind edit $ID --status in-progress
 ```
 
 ### Viewing Tasks
@@ -43,14 +54,30 @@ mind status                            # Show project status summary
 mind next                              # Show next ready task
 ```
 
+#### JSON Output
+
+Most viewing commands support `--json` for programmatic access:
+
+```bash
+mind list --json                       # JSON array of todos
+mind show <id> --json                  # Single todo as JSON
+mind status --json                     # Status summary as JSON
+mind next --json                       # Unblocked todos as JSON
+mind done <id> --json                  # Mark done, return result as JSON
+```
+
 ### Managing Tasks
 
 ```bash
 mind edit <id> --title "New title"              # Update title
 mind edit <id> --body "More details"             # Update body
 mind edit <id> --status in-progress              # Update status
-mind edit <id> --tags "priority,urgent"          # Replace tags
+mind edit <id> --tags "priority,urgent"          # Replace all tags
+mind tag <id> <tag>                              # Add a single tag
+mind untag <id> <tag>                            # Remove a single tag
 mind done <id>                                    # Mark as done
+mind done <id1> <id2> ...                          # Mark multiple as done
+mind done <id> --json                             # Mark done, JSON output
 ```
 
 ## Dependency Management
@@ -118,14 +145,13 @@ mind list --tag "cafe\u0301"  # Same results
 
 ```bash
 # 1. Add epic/task
-EPIC_ID=$(mind add "Feature: User authentication" --tags "feature,auth")
-# Extract ID from output
+EPIC_ID=$(mind add "Feature: User authentication" --tags "feature,auth" --quiet)
 
 # 2. Add subtasks
-DESIGN=$(mind add "Design login form" --tags "design")
-API=$(mind add "Implement login API" --tags "backend")
-UI=$(mind add "Create login UI" --tags "frontend")
-TEST=$(mind add "Write tests" --tags "testing")
+DESIGN=$(mind add "Design login form" --tags "design" --quiet)
+API=$(mind add "Implement login API" --tags "backend" --quiet)
+UI=$(mind add "Create login UI" --tags "frontend" --quiet)
+TEST=$(mind add "Write tests" --tags "testing" --quiet)
 
 # 3. Create dependencies
 mind link $DESIGN $EPIC_ID
@@ -158,16 +184,19 @@ mind next                              # Find next task
 
 ```bash
 # Add bug
-BUG=$(mind add "Fix: Login validation error" --tags "bug,urgent")
-# Extract ID from output
+BUG=$(mind add "Fix: Login validation error" --tags "bug,urgent" --quiet)
 
 # If blocked by investigation, add dependency
-INVESTIGATE=$(mind add "Investigate root cause")
+INVESTIGATE=$(mind add "Investigate root cause" --quiet)
 mind link $BUG $INVESTIGATE
 
 # Once investigated
 mind done $INVESTIGATE
 mind edit $BUG --status in-progress
+
+# Tag with more context as needed
+mind tag $BUG security
+mind untag $BUG urgent
 ```
 
 ## Testing
@@ -176,6 +205,51 @@ mind edit $BUG --status in-progress
 just test              # Test all
 just test-file <file>  # Test specific file
 just check             # Build + test
+```
+
+## JSON Output Formats
+
+### `status --json`
+
+```json
+{
+  "total": 10,
+  "by_status": {
+    "pending": 5,
+    "in_progress": 2,
+    "done": 3
+  },
+  "blocking_state": {
+    "blocked": 2,
+    "ready": 3
+  },
+  "progress_percent": 30.0
+}
+```
+
+### `next --json`
+
+```json
+{
+  "todos": [
+    {
+      "id": "1736205028-001",
+      "title": "Task name",
+      "status": "pending"
+    }
+  ],
+  "count": 1
+}
+```
+
+### `done --json`
+
+```json
+{
+  "marked": ["1736205028-001", "1736205028-002"],
+  "count": 2,
+  "errors": 0
+}
 ```
 
 ## Storage

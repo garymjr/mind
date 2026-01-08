@@ -4,12 +4,14 @@ pub const Args = struct {
     title: []const u8,
     body: ?[]const u8 = null,
     tags: ?[]const u8 = null,
+    quiet: bool = false,
 };
 
 const FLAGS = struct {
     const BODY = "--body";
     const TAGS = "--tags";
     const SHORT_TAGS = "-t";
+    const QUIET = "--quiet";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -27,6 +29,12 @@ pub fn parse(args: []const []const u8) !Args {
         // Handle flags
         if (std.mem.eql(u8, arg, FLAGS.HELP) or std.mem.eql(u8, arg, FLAGS.SHORT_HELP)) {
             return error.ShowHelp;
+        }
+
+        if (std.mem.eql(u8, arg, FLAGS.QUIET)) {
+            result.quiet = true;
+            i += 1;
+            continue;
         }
 
         if (std.mem.eql(u8, arg, FLAGS.BODY)) {

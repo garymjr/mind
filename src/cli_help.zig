@@ -24,6 +24,7 @@ const HELP_TEXT: []const u8 =
     \\    help [command]           Show help for command
     \\
     \\FLAGS:
+    \\    --quiet                  Output only the todo ID (for 'add')
     \\    --title <text>           Set title (for 'edit')
     \\    --body <text>            Set body text (for 'add', 'edit')
     \\    --tags, -t <t1,t2>       Set tags comma-separated (for 'add', 'edit')
@@ -75,12 +76,14 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind add <title> [FLAGS]
                 \\
                 \\FLAGS:
+                \\    --quiet             Output only the todo ID
                 \\    --body <text>      Optional body text (adds context)
                 \\    --tags, -t <t1,t2>  Comma-separated tags
                 \\
                 \\EXAMPLES:
                 \\    mind add "Fix login bug"
                 \\    mind add "Write docs" --body "Document the API endpoints" --tags "docs,urgent"
+                \\    mind add "Quick task" --quiet  # Output only: 1736205028-001
                 \\
                 \\
             );
