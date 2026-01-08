@@ -33,6 +33,8 @@ const HELP_TEXT: []const u8 =
     \\    --unblocked              Show only unblocked todos
     \\    --all                    Show all unblocked todos (for 'next')
     \\    --reason <text>          Set resolution reason (for 'done')
+    \\    --force                  Delete with dependencies (for 'delete')
+    \\    --yes                    Skip confirmation prompts
     \\    --json                   Output as JSON
     \\    --help, -h               Show this help
     \\
@@ -202,17 +204,21 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Delete a todo
                 \\
                 \\USAGE:
-                \\    mind delete <id> [--force]
-                \\    mind remove <id> [--force]
+                \\    mind delete <id> [--force] [--yes]
+                \\    mind remove <id> [--force] [--yes]
                 \\
                 \\FLAGS:
-                \\    --force            Delete todo and all linked todos
+                \\    --force            Delete todo and all linked todos transitively
+                \\    --yes              Skip confirmation prompt (use with caution)
                 \\
-                \\NOTE: Cannot delete a todo with linked dependencies without --force
+                \\NOTE: Cannot delete a todo with linked dependencies without --force.
+                \\When using --force, you will be shown a preview of what will be deleted
+                \\and asked to confirm (unless --yes is also specified).
                 \\
                 \\EXAMPLES:
                 \\    mind delete 1736205028-001
                 \\    mind remove 1736205028-001 --force
+                \\    mind delete 1736205028-001 --force --yes  # skip confirmation
                 \\
                 \\
             );

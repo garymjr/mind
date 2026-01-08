@@ -38,6 +38,7 @@ pub const Args = struct {
     all: bool = false,
     json: bool = false,
     force: bool = false,
+    yes: bool = false,
     parent: ?[]const u8 = null, // second ID for link command
 };
 
@@ -55,6 +56,7 @@ const FLAG_DEFINITIONS = struct {
     const JSON = "--json";
     const FROM = "--from";
     const FORCE = "--force";
+    const YES = "--yes";
     const REASON = "--reason";
     const HELP = "--help";
     const SHORT_HELP = "-h";
@@ -153,6 +155,12 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
 
         if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.FORCE)) {
             result.force = true;
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.YES)) {
+            result.yes = true;
             i += 1;
             continue;
         }

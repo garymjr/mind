@@ -369,7 +369,7 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     if (args.force) {
         var deleted_count: usize = 1; // Start with the main todo
 
-        // Recursively delete all linked todos
+        // Recursively collect ALL linked todos transitively
         var i: usize = 0;
         while (i < linked_ids.items.len) {
             const id = linked_ids.items[i];
@@ -400,16 +400,48 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
                         try linked_ids.append(allocator, try allocator.dupe(u8, blocked_id));
                     }
                 }
-                try todo_list.remove(id);
-                deleted_count += 1;
             }
             i += 1;
+        }
+
+        // Show what will be deleted
+        const total_to_delete = linked_ids.items.len + 1;
+        try stderr.interface.writeAll("WARNING: This will delete ");
+        try stderr.interface.print("{d} todos:\n", .{total_to_delete});
+        try stderr.interface.print("  Target: {s} {s}\n", .{ args.target.?, todo_to_delete.title });
+        for (linked_ids.items) |id| {
+            if (todo_list.findById(id)) |t| {
+                try stderr.interface.print("    {s} {s}\n", .{ id, t.title });
+            }
+        }
+        try stderr.interface.writeAll("\n");
+
+        // Require explicit confirmation (unless --yes flag is set)
+        if (!args.yes) {
+            try stderr.interface.print("Delete {d} todos? [y/N]: ", .{total_to_delete});
+            try stderr.end();
+            const stdin = std.fs.File.stdin();
+            var input_buf: [10]u8 = undefined;
+            const input = stdin.read(&input_buf) catch 0;
+            const response = if (input > 0) input_buf[0] else 'N';
+
+            if (response != 'y' and response != 'Y') {
+                const stderr_file = std.fs.File.stderr();
+                try stderr_file.writeAll("Aborted.\n");
+                std.process.exit(0);
+            }
+        }
+
+        // Now perform the deletions
+        for (linked_ids.items) |id| {
+            try todo_list.remove(id);
+            deleted_count += 1;
         }
 
         // Delete the main todo
         try todo_list.remove(args.target.?);
 
-        try stdout.interface.print("Deleted {d} todos (including dependencies)\n", .{deleted_count});
+        try stdout.interface.print("Deleted {d} todos\n", .{deleted_count});
     } else {
         // Just delete the single todo
         try todo_list.remove(args.target.?);
