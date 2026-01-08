@@ -73,8 +73,8 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.target == null) {
         try cli.printError(stderr, "edit requires a todo ID", .{});
@@ -171,6 +171,7 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    errdefer stdout.end() catch {};
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
@@ -226,6 +227,7 @@ pub fn executeStatus(allocator: std.mem.Allocator, _: cli.Args, store_path: []co
 pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    errdefer stdout.end() catch {};
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
@@ -298,8 +300,8 @@ pub fn executeShow(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.target == null) {
         try (&stderr.interface).writeAll("error: show requires a todo ID\n");
@@ -334,8 +336,8 @@ pub fn executeDelete(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.target == null) {
         try cli.printError(stderr, "delete requires a todo ID", .{});
@@ -485,8 +487,8 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.target == null) {
         try cli.printError(stderr, "done requires a todo ID", .{});
@@ -539,8 +541,8 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     var st = storage.Storage.init(allocator, store_path);
     var todo_list = try st.load();
@@ -592,8 +594,8 @@ pub fn executeLink(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.target == null) {
         try cli.printError(stderr, "link requires child todo ID", .{});
@@ -682,8 +684,8 @@ pub fn executeUnlink(allocator: std.mem.Allocator, args: cli.Args, store_path: [
     var stderr_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     var stderr = std.fs.File.stderr().writer(&stderr_buf);
-    defer stdout.end() catch {};
-    defer stderr.end() catch {};
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.target == null) {
         try cli.printError(stderr, "unlink requires child todo ID", .{});
