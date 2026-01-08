@@ -160,7 +160,7 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli_args.Edit.Args, store
     }
 }
 
-pub fn executeStatus(allocator: std.mem.Allocator, _: cli_args.Status.Args, store_path: []const u8) !void {
+pub fn executeStatus(allocator: std.mem.Allocator, args: cli_args.Status.Args, store_path: []const u8) !void {
     var stdout_buf: [65536]u8 = undefined;
     var stdout = std.fs.File.stdout().writer(&stdout_buf);
     errdefer stdout.end() catch {};
@@ -194,23 +194,45 @@ pub fn executeStatus(allocator: std.mem.Allocator, _: cli_args.Status.Args, stor
     const total = todo_list.todos.len;
     const w = &stdout.interface;
 
-    try w.writeAll("Project Status\n");
-    try w.writeAll("══════════════\n\n");
+    if (args.json) {
+        const progress_pct = if (total > 0)
+            @as(f64, @floatFromInt(done_count)) / @as(f64, @floatFromInt(total)) * 100.0
+        else
+            0.0;
+        try w.print(
+            \\{{
+            \\  "total": {d},
+            \\  "by_status": {{
+            \\    "pending": {d},
+            \\    "in_progress": {d},
+            \\    "done": {d}
+            \\  }},
+            \\  "blocking_state": {{
+            \\    "blocked": {d},
+            \\    "ready": {d}
+            \\  }},
+            \\  "progress_percent": {d:.1}
+            \\}}
+        , .{ total, pending_count, in_progress_count, done_count, blocked_count, unblocked_pending, progress_pct });
+    } else {
+        try w.writeAll("Project Status\n");
+        try w.writeAll("══════════════\n\n");
 
-    try w.print("Total todos: {d}\n\n", .{total});
+        try w.print("Total todos: {d}\n\n", .{total});
 
-    try w.writeAll("By Status:\n");
-    try w.print("  Pending:      {d}\n", .{pending_count});
-    try w.print("  In Progress:  {d}\n", .{in_progress_count});
-    try w.print("  Done:         {d}\n", .{done_count});
+        try w.writeAll("By Status:\n");
+        try w.print("  Pending:      {d}\n", .{pending_count});
+        try w.print("  In Progress:  {d}\n", .{in_progress_count});
+        try w.print("  Done:         {d}\n", .{done_count});
 
-    try w.writeAll("\nBlocking State:\n");
-    try w.print("  Blocked:      {d}\n", .{blocked_count});
-    try w.print("  Ready to do:  {d}\n", .{unblocked_pending});
+        try w.writeAll("\nBlocking State:\n");
+        try w.print("  Blocked:      {d}\n", .{blocked_count});
+        try w.print("  Ready to do:  {d}\n", .{unblocked_pending});
 
-    if (pending_count > 0) {
-        const progress_pct = @as(f64, @floatFromInt(done_count)) / @as(f64, @floatFromInt(total)) * 100.0;
-        try w.print("\nProgress: {d:.1}% complete\n", .{progress_pct});
+        if (pending_count > 0) {
+            const progress_pct = @as(f64, @floatFromInt(done_count)) / @as(f64, @floatFromInt(total)) * 100.0;
+            try w.print("\nProgress: {d:.1}% complete\n", .{progress_pct});
+        }
     }
 
     try stdout.end();
@@ -488,6 +510,12 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli_args.Done.Args, store
     var todo_list = try st.load();
     defer todo_list.deinit();
 
+    var marked_ids = std.ArrayListUnmanaged([]const u8){};
+    defer {
+        for (marked_ids.items) |id| allocator.free(id);
+        marked_ids.deinit(allocator);
+    }
+
     var marked_count: usize = 0;
     var error_count: usize = 0;
 
@@ -527,6 +555,7 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli_args.Done.Args, store
         allocator.free(todo_list.todos[idx].updated_at);
         todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
 
+        try marked_ids.append(allocator, try allocator.dupe(u8, id));
         marked_count += 1;
     }
 
@@ -535,16 +564,25 @@ pub fn executeDone(allocator: std.mem.Allocator, args: cli_args.Done.Args, store
         try st.save(&todo_list);
     }
 
-    if (marked_count > 0) {
-        if (marked_count == 1) {
-            try stdout.interface.print("Marked {d} todo as done: {s}\n", .{ marked_count, args.ids[0] });
-        } else {
-            try stdout.interface.print("Marked {d} todos as done\n", .{marked_count});
+    if (args.json) {
+        try stdout.interface.writeAll("{\n  \"marked\": [");
+        for (marked_ids.items, 0..) |id, i| {
+            if (i > 0) try stdout.interface.writeAll(", ");
+            try stdout.interface.print("\"{s}\"", .{id});
         }
-    }
+        try stdout.interface.print("],\n  \"count\": {d},\n  \"errors\": {d}\n}}\n", .{ marked_count, error_count });
+    } else {
+        if (marked_count > 0) {
+            if (marked_count == 1) {
+                try stdout.interface.print("Marked {d} todo as done: {s}\n", .{ marked_count, args.ids[0] });
+            } else {
+                try stdout.interface.print("Marked {d} todos as done\n", .{marked_count});
+            }
+        }
 
-    if (error_count > 0) {
-        try stdout.interface.print("{d} error(s) occurred\n", .{error_count});
+        if (error_count > 0) {
+            try stdout.interface.print("{d} error(s) occurred\n", .{error_count});
+        }
     }
 
     try stdout.end();
@@ -587,11 +625,33 @@ pub fn executeNext(allocator: std.mem.Allocator, args: cli_args.Next.Args, store
     }
 
     if (unblocked.items.len == 0) {
-        try stdout.interface.writeAll("No unblocked todos found.\n");
+        if (args.json) {
+            try stdout.interface.writeAll("{\n  \"todos\": [],\n  \"count\": 0\n}\n");
+        } else {
+            try stdout.interface.writeAll("No unblocked todos found.\n");
+        }
+        try stdout.end();
         return;
     }
 
-    if (args.all) {
+    if (args.json) {
+        try stdout.interface.writeAll("{\n  \"todos\": [\n");
+        for (unblocked.items, 0..) |item, i| {
+            if (i > 0) try stdout.interface.writeAll(",\n");
+            try stdout.interface.writeAll("    {\n");
+            try stdout.interface.writeAll("      \"id\": \"");
+            try util.writeEscapedStringToWriter(&stdout.interface, item.id);
+            try stdout.interface.writeAll("\",\n");
+            try stdout.interface.writeAll("      \"title\": \"");
+            try util.writeEscapedStringToWriter(&stdout.interface, item.title);
+            try stdout.interface.writeAll("\",\n");
+            try stdout.interface.print("      \"status\": \"{s}\"\n", .{item.status.toString()});
+            try stdout.interface.writeAll("    }");
+        }
+        try stdout.interface.writeAll("\n  ],\n  \"count\": ");
+        try stdout.interface.print("{d}\n", .{unblocked.items.len});
+        try stdout.interface.writeAll("}\n");
+    } else if (args.all) {
         try stdout.interface.writeAll("Unblocked todos:\n");
         for (unblocked.items) |item| {
             try stdout.interface.print("  {s} {s:<12} {s}\n", .{ item.id, item.status.toString(), item.title });

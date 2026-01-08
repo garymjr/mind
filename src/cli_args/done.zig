@@ -3,10 +3,12 @@ const std = @import("std");
 pub const Args = struct {
     ids: []const []const u8,
     reason: ?[]const u8 = null,
+    json: bool = false,
 };
 
 const FLAGS = struct {
     const REASON = "--reason";
+    const JSON = "--json";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -30,6 +32,12 @@ pub fn parse(args: []const []const u8) !Args {
             i += 1;
             if (i >= args.len) return error.MissingValueForFlag;
             result.reason = args[i];
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, FLAGS.JSON)) {
+            result.json = true;
             i += 1;
             continue;
         }

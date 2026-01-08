@@ -2,10 +2,12 @@ const std = @import("std");
 
 pub const Args = struct {
     all: bool = false,
+    json: bool = false,
 };
 
 const FLAGS = struct {
     const ALL = "--all";
+    const JSON = "--json";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -24,6 +26,12 @@ pub fn parse(args: []const []const u8) !Args {
 
         if (std.mem.eql(u8, arg, FLAGS.ALL)) {
             result.all = true;
+            i += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, FLAGS.JSON)) {
+            result.json = true;
             i += 1;
             continue;
         }

@@ -364,7 +364,7 @@ pub fn escapeJsonString(allocator: std.mem.Allocator, input: []const u8) ![]cons
 
 /// Writes an escaped string directly to a writer, avoiding allocation.
 /// Use this for tight loops where allocating per string would be inefficient.
-fn writeEscapedStringToWriter(writer: anytype, input: []const u8) !void {
+pub fn writeEscapedStringToWriter(writer: anytype, input: []const u8) !void {
     for (input) |c| {
         switch (c) {
             '\\' => try writer.writeAll("\\\\"),

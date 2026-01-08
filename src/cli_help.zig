@@ -153,12 +153,16 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Show project status summary
                 \\
                 \\USAGE:
-                \\    mind status
+                \\    mind status [--json]
+                \\
+                \\FLAGS:
+                \\    --json             Output as JSON
                 \\
                 \\Displays a summary of all todos grouped by status and blocking state.
                 \\
                 \\EXAMPLES:
                 \\    mind status
+                \\    mind status --json
                 \\
                 \\
             );
@@ -168,10 +172,11 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Mark todo(s) as done
                 \\
                 \\USAGE:
-                \\    mind done <id> [<id> ...] [--reason <text>]
+                \\    mind done <id> [<id> ...] [--reason <text>] [--json]
                 \\
                 \\FLAGS:
                 \\    --reason <text>    Optional reason for completion
+                \\    --json             Output as JSON
                 \\
                 \\NOTE: Cannot mark blocked todos as done
                 \\
@@ -179,6 +184,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind done 1736205028-001
                 \\    mind done 1736205028-001 --reason "Fixed the memory leak"
                 \\    mind done 1736205028-001 1736205028-002 1736205028-003
+                \\    mind done 1736205028-001 --json
                 \\
                 \\
             );
@@ -188,14 +194,16 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Show next unblocked todo
                 \\
                 \\USAGE:
-                \\    mind next [--all]
+                \\    mind next [--all] [--json]
                 \\
                 \\FLAGS:
                 \\    --all              Show all unblocked todos
+                \\    --json             Output as JSON (includes all unblocked todos)
                 \\
                 \\EXAMPLES:
                 \\    mind next
                 \\    mind next --all
+                \\    mind next --json
                 \\
                 \\
             );
