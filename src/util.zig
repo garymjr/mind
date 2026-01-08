@@ -4,6 +4,7 @@ const todo = @import("todo.zig");
 const MAX_TITLE_LENGTH = 100;
 
 /// Escapes a string for JSON output (handles backslash, quotes, control chars)
+/// Returns allocated string. For direct writing to buffered output, prefer writeEscapedStringToWriter.
 pub fn escapeJsonString(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
     var result = std.ArrayListUnmanaged(u8){};
     errdefer result.deinit(allocator);
@@ -33,63 +34,90 @@ pub fn escapeJsonString(allocator: std.mem.Allocator, input: []const u8) ![]cons
     return result.toOwnedSlice(allocator);
 }
 
+/// Writes an escaped string directly to a writer, avoiding allocation.
+/// Use this for tight loops where allocating per string would be inefficient.
+fn writeEscapedStringToWriter(writer: anytype, input: []const u8) !void {
+    for (input) |c| {
+        switch (c) {
+            '\\' => try writer.writeAll("\\\\"),
+            '"' => try writer.writeAll("\\\""),
+            '/' => try writer.writeAll("\\/"),
+            0x08 => try writer.writeAll("\\b"),
+            0x0C => try writer.writeAll("\\f"),
+            '\n' => try writer.writeAll("\\n"),
+            '\r' => try writer.writeAll("\\r"),
+            '\t' => try writer.writeAll("\\t"),
+            else => {
+                if (c < 0x20) {
+                    try writer.writeAll("\\u00");
+                    try writer.print("{x:0>2}", .{c});
+                } else {
+                    try writer.writeByte(c);
+                }
+            },
+        }
+    }
+}
+
 /// Writes a single todo as JSON to a writer (no newline after closing brace)
 pub fn writeTodoJson(writer: anytype, allocator: std.mem.Allocator, item: todo.Todo) !void {
-    const escaped_id = try escapeJsonString(allocator, item.id);
-    defer allocator.free(escaped_id);
-
-    const escaped_title = try escapeJsonString(allocator, item.title);
-    defer allocator.free(escaped_title);
-
-    const escaped_body = try escapeJsonString(allocator, item.body);
-    defer allocator.free(escaped_body);
-
-    const escaped_resolution = try escapeJsonString(allocator, item.resolution_reason);
-    defer allocator.free(escaped_resolution);
-
+    _ = allocator; // Unused after optimization
     const status_str = item.status.toString();
 
     try writer.writeAll("    {\n");
-    try writer.print("      \"id\": \"{s}\",\n", .{escaped_id});
-    try writer.print("      \"title\": \"{s}\",\n", .{escaped_title});
-    try writer.print("      \"body\": \"{s}\",\n", .{escaped_body});
+    try writer.writeAll("      \"id\": \"");
+    try writeEscapedStringToWriter(writer, item.id);
+    try writer.writeAll("\",\n");
+
+    try writer.writeAll("      \"title\": \"");
+    try writeEscapedStringToWriter(writer, item.title);
+    try writer.writeAll("\",\n");
+
+    try writer.writeAll("      \"body\": \"");
+    try writeEscapedStringToWriter(writer, item.body);
+    try writer.writeAll("\",\n");
+
     try writer.print("      \"status\": \"{s}\",\n", .{status_str});
 
     try writer.writeAll("      \"tags\": [");
     for (item.tags, 0..) |tag, j| {
-        const escaped_tag = try escapeJsonString(allocator, tag);
-        defer allocator.free(escaped_tag);
-        try writer.print("\"{s}\"", .{escaped_tag});
+        try writer.writeAll("\"");
+        try writeEscapedStringToWriter(writer, tag);
+        try writer.writeAll("\"");
         if (j < item.tags.len - 1) try writer.writeAll(", ");
     }
     try writer.writeAll("],\n");
 
     try writer.writeAll("      \"depends_on\": [");
     for (item.depends_on, 0..) |dep, j| {
-        const escaped_dep = try escapeJsonString(allocator, dep);
-        defer allocator.free(escaped_dep);
-        try writer.print("\"{s}\"", .{escaped_dep});
+        try writer.writeAll("\"");
+        try writeEscapedStringToWriter(writer, dep);
+        try writer.writeAll("\"");
         if (j < item.depends_on.len - 1) try writer.writeAll(", ");
     }
     try writer.writeAll("],\n");
 
     try writer.writeAll("      \"blocked_by\": [");
     for (item.blocked_by, 0..) |blocked, j| {
-        const escaped_blocked = try escapeJsonString(allocator, blocked);
-        defer allocator.free(escaped_blocked);
-        try writer.print("\"{s}\"", .{escaped_blocked});
+        try writer.writeAll("\"");
+        try writeEscapedStringToWriter(writer, blocked);
+        try writer.writeAll("\"");
         if (j < item.blocked_by.len - 1) try writer.writeAll(", ");
     }
     try writer.writeAll("],\n");
 
-    const escaped_created = try escapeJsonString(allocator, item.created_at);
-    defer allocator.free(escaped_created);
-    const escaped_updated = try escapeJsonString(allocator, item.updated_at);
-    defer allocator.free(escaped_updated);
+    try writer.writeAll("      \"created_at\": \"");
+    try writeEscapedStringToWriter(writer, item.created_at);
+    try writer.writeAll("\",\n");
 
-    try writer.print("      \"created_at\": \"{s}\",\n", .{escaped_created});
-    try writer.print("      \"updated_at\": \"{s}\",\n", .{escaped_updated});
-    try writer.print("      \"resolution_reason\": \"{s}\"\n", .{escaped_resolution});
+    try writer.writeAll("      \"updated_at\": \"");
+    try writeEscapedStringToWriter(writer, item.updated_at);
+    try writer.writeAll("\",\n");
+
+    try writer.writeAll("      \"resolution_reason\": \"");
+    try writeEscapedStringToWriter(writer, item.resolution_reason);
+    try writer.writeAll("\"\n");
+
     try writer.writeAll("    }");
 }
 
@@ -383,4 +411,29 @@ test "escapeJsonString escapes all control chars from 0x00 to 0x1F" {
 
     const expected = "\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f";
     try std.testing.expectEqualStrings(expected, result);
+}
+
+test "writeEscapedStringToWriter matches escapeJsonString" {
+    const allocator = std.testing.allocator;
+    const test_cases = [_][]const u8{
+        "plain text",
+        "test\\value",
+        "test\"value",
+        "line1\nline2",
+        "text\rmore",
+        "col1\tcol2",
+        "line1\n\"quoted\"\\slash\r\n",
+        "path/to/file",
+    };
+
+    for (test_cases) |input| {
+        const allocated = try escapeJsonString(allocator, input);
+        defer allocator.free(allocated);
+
+        var buffer = std.ArrayList(u8).init(allocator);
+        defer buffer.deinit();
+        try writeEscapedStringToWriter(buffer.writer(), input);
+
+        try std.testing.expectEqualStrings(allocated, buffer.items);
+    }
 }
