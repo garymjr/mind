@@ -229,6 +229,14 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     defer filtered.deinit(allocator);
 
     for (todo_list.todos) |*item| {
+        // Apply status filter
+        if (args.status) |status_str| {
+            const filter_status = todo.Status.fromString(status_str);
+            if (filter_status) |s| {
+                if (item.status != s) continue;
+            }
+        }
+
         // Apply tag filter
         if (args.tag_filter) |filter_tag| {
             var has_tag = false;
