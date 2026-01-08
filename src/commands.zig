@@ -15,6 +15,11 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []co
         return error.MissingTitle;
     }
 
+    if (args.title.?.len == 0) {
+        try stderr.writeAll("error: title cannot be empty\n");
+        return error.TitleEmpty;
+    }
+
     var tags_list = std.ArrayListUnmanaged([]const u8){};
     defer tags_list.deinit(allocator);
 
