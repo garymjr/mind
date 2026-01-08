@@ -27,7 +27,7 @@ const HELP_TEXT: []const u8 =
     \\    --title <text>           Set title (for 'edit')
     \\    --body <text>            Set body text (for 'add', 'edit')
     \\    --tags, -t <t1,t2>       Set tags comma-separated (for 'add', 'edit')
-    \\    --status <s>             Set/filter by status: pending, in-progress, done
+    \\    --status, -s <s>         Set/filter by status: pending, in-progress, done
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
     \\    --unblocked              Show only unblocked todos
@@ -88,13 +88,13 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Edit an existing todo (alias: update)
                 \\
                 \\USAGE:
-                \\    mind edit <id> [--title <text>] [--body <text>] [--status <s>] [--tags, -t <t1,t2>]
+                \\    mind edit <id> [--title <text>] [--body <text>] [--status, -s <s>] [--tags, -t <t1,t2>]
                 \\    mind update <id> [...]
                 \\
                 \\FLAGS:
                 \\    --title <text>     New title
                 \\    --body <text>      New body text
-                \\    --status <s>       New status: pending, in-progress, done
+                \\    --status, -s <s>   New status: pending, in-progress, done
                 \\    --tags, -t <t1,t2>  Comma-separated tags (replaces existing)
                 \\
                 \\At least one field must be specified.
@@ -116,7 +116,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind list [FLAGS]
                 \\
                 \\FLAGS:
-                \\    --status <s>       Filter: pending, in-progress, done
+                \\    --status, -s <s>   Filter: pending, in-progress, done
                 \\    --tag <tag>        Filter by tag
                 \\    --blocked          Show only blocked todos
                 \\    --unblocked        Show only unblocked todos
