@@ -103,7 +103,7 @@ const HELP_TEXT =
     \\COMMANDS:
     \\    quickstart               Get started with mind
     \\    add <title>              Add a new todo
-    \\    edit <id>                Edit an existing todo
+    \\    edit, update <id>        Edit an existing todo
     \\    list                     List all todos
     \\    show <id>                Show todo details
     \\    done <id>                Mark todo as done

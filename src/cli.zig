@@ -199,6 +199,7 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "quickstart")) return .quickstart;
     if (std.mem.eql(u8, str, "add")) return .add;
     if (std.mem.eql(u8, str, "edit")) return .edit;
+    if (std.mem.eql(u8, str, "update")) return .edit;
     if (std.mem.eql(u8, str, "list")) return .list;
     if (std.mem.eql(u8, str, "show")) return .show;
     if (std.mem.eql(u8, str, "done")) return .done;

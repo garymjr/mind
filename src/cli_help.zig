@@ -10,7 +10,7 @@ const HELP_TEXT: []const u8 =
     \\COMMANDS:
     \\    quickstart               Get started with mind
     \\    add <title>              Add a new todo
-    \\    edit <id>                Edit an existing todo
+    \\    edit, update <id>        Edit an existing todo
     \\    list                     List all todos
     \\    show <id>                Show todo details
     \\    done <id>                Mark todo as done
@@ -83,10 +83,11 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
         },
         .edit => {
             try writer.interface.writeAll(
-                \\Edit an existing todo
+                \\Edit an existing todo (alias: update)
                 \\
                 \\USAGE:
                 \\    mind edit <id> [--title <text>] [--body <text>] [--status <s>] [--tags <t1,t2>]
+                \\    mind update <id> [...]
                 \\
                 \\FLAGS:
                 \\    --title <text>     New title
@@ -98,9 +99,9 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\
                 \\EXAMPLES:
                 \\    mind edit 1736205028-001 --title "Updated title"
+                \\    mind update 1736205028-001 --status in-progress
                 \\    mind edit 1736205028-001 --body "More details"
-                \\    mind edit 1736205028-001 --status in-progress
-                \\    mind edit 1736205028-001 --tags "bug,urgent"
+                \\    mind update 1736205028-001 --tags "bug,urgent"
                 \\
                 \\
             );
