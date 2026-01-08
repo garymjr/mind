@@ -90,7 +90,7 @@ pub const TodoList = struct {
 
     pub fn remove(self: *TodoList, id: []const u8) !void {
         const idx = self.findIndexById(id) orelse return error.TodoNotFound;
-        
+
         // Free removed todo memory
         const todo = self.todos[idx];
         self.allocator.free(todo.id);
@@ -98,7 +98,9 @@ pub const TodoList = struct {
         self.allocator.free(todo.body);
         for (todo.tags) |tag| self.allocator.free(tag);
         self.allocator.free(todo.tags);
+        for (todo.depends_on) |dep| self.allocator.free(dep);
         self.allocator.free(todo.depends_on);
+        for (todo.blocked_by) |blocked| self.allocator.free(blocked);
         self.allocator.free(todo.blocked_by);
         self.allocator.free(todo.created_at);
         self.allocator.free(todo.updated_at);
