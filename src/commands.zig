@@ -1,6 +1,7 @@
 const std = @import("std");
 const cli = @import("cli.zig");
 const todo = @import("todo.zig");
+const util = @import("util.zig");
 const storage = @import("storage.zig");
 
 const BODY_HINT = "Tip: Add a body with --body to provide context for this todo";
@@ -59,6 +60,99 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []co
         try stdout.writeAll("\n");
         try stdout.writeAll(BODY_HINT);
         try stdout.writeAll("\n");
+    }
+}
+
+pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []const u8) !void {
+    var stdout_buf: [4096]u8 = undefined;
+    var stderr_buf: [4096]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    defer stdout.end() catch {};
+    defer stderr.end() catch {};
+
+    if (args.target == null) {
+        try cli.printError(stderr, "edit requires a todo ID", .{});
+        try cli.printCommandHelp(&stdout, .edit);
+        return error.MissingId;
+    }
+
+    // At least one field must be specified to edit
+    if (args.title == null and args.body == null and args.status == null and args.tags == null) {
+        try cli.printError(stderr, "edit requires at least one field to edit: --title, --body, --status, or --tags", .{});
+        try cli.printCommandHelp(&stdout, .edit);
+        return error.MissingEditField;
+    }
+
+    var st = storage.Storage.init(allocator, store_path);
+    var todo_list = try st.load();
+    defer todo_list.deinit();
+
+    const idx = todo_list.findIndexById(args.target.?) orelse {
+        try cli.printError(stderr, "todo not found: {s}", .{args.target.?});
+        return error.TodoNotFound;
+    };
+
+    var modified = false;
+
+    // Update title
+    if (args.title) |new_title| {
+        try util.validateTitle(new_title);
+        allocator.free(todo_list.todos[idx].title);
+        todo_list.todos[idx].title = try allocator.dupe(u8, new_title);
+        modified = true;
+    }
+
+    // Update body
+    if (args.body) |new_body| {
+        allocator.free(todo_list.todos[idx].body);
+        todo_list.todos[idx].body = try allocator.dupe(u8, new_body);
+        modified = true;
+    }
+
+    // Update status
+    if (args.status) |status_str| {
+        const new_status = todo.Status.fromString(status_str) orelse {
+            try cli.printError(stderr, "invalid status: {s} (must be: pending, in-progress, done)", .{status_str});
+            return error.InvalidStatus;
+        };
+        todo_list.todos[idx].status = new_status;
+        modified = true;
+    }
+
+    // Update tags (replace all)
+    if (args.tags) |tags_str| {
+        // Free old tags
+        for (todo_list.todos[idx].tags) |tag| allocator.free(tag);
+        allocator.free(todo_list.todos[idx].tags);
+
+        // Parse new tags
+        var tags_list = std.ArrayListUnmanaged([]const u8){};
+        defer tags_list.deinit(allocator);
+        var iter = std.mem.splitScalar(u8, tags_str, ',');
+        while (iter.next()) |tag| {
+            const trimmed = std.mem.trim(u8, tag, " ");
+            if (trimmed.len > 0) {
+                try tags_list.append(allocator, trimmed);
+            }
+        }
+
+        // Allocate new tags array
+        var new_tags = try allocator.alloc([]const u8, tags_list.items.len);
+        for (tags_list.items, 0..) |tag, i| {
+            new_tags[i] = try allocator.dupe(u8, tag);
+        }
+        todo_list.todos[idx].tags = new_tags;
+        modified = true;
+    }
+
+    if (modified) {
+        // Update timestamp
+        allocator.free(todo_list.todos[idx].updated_at);
+        todo_list.todos[idx].updated_at = try std.fmt.allocPrint(allocator, "{d}", .{std.time.timestamp()});
+
+        try st.save(&todo_list);
+        try stdout.interface.print("Updated todo: {s}\n", .{args.target.?});
     }
 }
 

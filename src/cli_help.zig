@@ -10,6 +10,7 @@ const HELP_TEXT: []const u8 =
     \\COMMANDS:
     \\    quickstart               Get started with mind
     \\    add <title>              Add a new todo
+    \\    edit <id>                Edit an existing todo
     \\    list                     List all todos
     \\    show <id>                Show todo details
     \\    done <id>                Mark todo as done
@@ -22,9 +23,10 @@ const HELP_TEXT: []const u8 =
     \\    help [command]           Show help for command
     \\
     \\FLAGS:
-    \\    --body <text>            Set body text (for 'add')
-    \\    --tags <t1,t2>           Set tags comma-separated (for 'add')
-    \\    --status <s>             Filter by status: pending, in-progress, done
+    \\    --title <text>           Set title (for 'edit')
+    \\    --body <text>            Set body text (for 'add', 'edit')
+    \\    --tags <t1,t2>           Set tags comma-separated (for 'add', 'edit')
+    \\    --status <s>             Set/filter by status: pending, in-progress, done
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
     \\    --unblocked              Show only unblocked todos
@@ -35,6 +37,8 @@ const HELP_TEXT: []const u8 =
     \\
     \\EXAMPLES:
     \\    mind add "Implement auth" --body "Add JWT authentication" --tags "feature,security"
+    \\    mind edit 1234567890-001 --title "Fix auth implementation"
+    \\    mind edit 1234567890-001 --status in-progress
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind show 1234567890-001
@@ -73,6 +77,30 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\EXAMPLES:
                 \\    mind add "Fix login bug"
                 \\    mind add "Write docs" --body "Document the API endpoints" --tags "docs,urgent"
+                \\
+                \\
+            );
+        },
+        .edit => {
+            try writer.interface.writeAll(
+                \\Edit an existing todo
+                \\
+                \\USAGE:
+                \\    mind edit <id> [--title <text>] [--body <text>] [--status <s>] [--tags <t1,t2>]
+                \\
+                \\FLAGS:
+                \\    --title <text>     New title
+                \\    --body <text>      New body text
+                \\    --status <s>       New status: pending, in-progress, done
+                \\    --tags <t1,t2>     Comma-separated tags (replaces existing)
+                \\
+                \\At least one field must be specified.
+                \\
+                \\EXAMPLES:
+                \\    mind edit 1736205028-001 --title "Updated title"
+                \\    mind edit 1736205028-001 --body "More details"
+                \\    mind edit 1736205028-001 --status in-progress
+                \\    mind edit 1736205028-001 --tags "bug,urgent"
                 \\
                 \\
             );

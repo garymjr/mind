@@ -10,6 +10,7 @@ pub const Command = enum {
     help,
     quickstart,
     add,
+    edit,
     list,
     show,
     done,
@@ -40,6 +41,7 @@ pub const Args = struct {
 };
 
 const FLAG_DEFINITIONS = struct {
+    const TITLE = "--title";
     const BODY = "--body";
     const TAGS = "--tags";
     const STATUS = "--status";
@@ -64,6 +66,14 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
 
         if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.HELP) or std.mem.eql(u8, arg, FLAG_DEFINITIONS.SHORT_HELP)) {
             return Args{ .command = .help };
+        }
+
+        if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.TITLE)) {
+            i += 1;
+            if (i >= args.len) return error.MissingValueForFlag;
+            result.title = args[i];
+            i += 1;
+            continue;
         }
 
         if (std.mem.eql(u8, arg, FLAG_DEFINITIONS.BODY)) {
@@ -151,12 +161,17 @@ pub fn parseArgs(_: std.mem.Allocator, args: []const [:0]const u8) !Args {
         } else {
             // Positional argument
             // For 'add' command, first positional arg is title
+            // For 'edit' command, first positional arg is target (id)
             // For 'link' command, positional args are: child, parent
             // For other commands, first positional arg is target (id)
             if (result.command == .add) {
                 if (result.title == null) {
                     result.title = arg;
                 } else if (result.target == null) {
+                    result.target = arg;
+                }
+            } else if (result.command == .edit) {
+                if (result.target == null) {
                     result.target = arg;
                 }
             } else if (result.command == .link) {
@@ -183,6 +198,7 @@ pub fn parseCommand(str: []const u8) ?Command {
     if (std.mem.eql(u8, str, "help")) return .help;
     if (std.mem.eql(u8, str, "quickstart")) return .quickstart;
     if (std.mem.eql(u8, str, "add")) return .add;
+    if (std.mem.eql(u8, str, "edit")) return .edit;
     if (std.mem.eql(u8, str, "list")) return .list;
     if (std.mem.eql(u8, str, "show")) return .show;
     if (std.mem.eql(u8, str, "done")) return .done;

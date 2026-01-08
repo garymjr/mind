@@ -104,7 +104,7 @@ When adding new commands, workflows, or common command patterns, **always update
 
 ## Unimplemented Commands
 
-- `tag`, `untag`, `link`, `unlink`, `delete`
+- `tag`, `untag`
 
 ## Justfile
 

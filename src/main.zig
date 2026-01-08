@@ -74,6 +74,7 @@ pub fn main() !void {
             try stdout.writeAll(QUICKSTART_TEXT);
         },
         .add => try commands.executeAdd(allocator, parsed, MIND_FILE),
+        .edit => try commands.executeEdit(allocator, parsed, MIND_FILE),
         .list => try commands.executeList(allocator, parsed, MIND_FILE),
         .show => try commands.executeShow(allocator, parsed, MIND_FILE),
         .done => try commands.executeDone(allocator, parsed, MIND_FILE),
@@ -102,6 +103,7 @@ const HELP_TEXT =
     \\COMMANDS:
     \\    quickstart               Get started with mind
     \\    add <title>              Add a new todo
+    \\    edit <id>                Edit an existing todo
     \\    list                     List all todos
     \\    show <id>                Show todo details
     \\    done <id>                Mark todo as done
@@ -115,9 +117,10 @@ const HELP_TEXT =
     \\    help [command]           Show help for command
     \\
     \\FLAGS:
-    \\    --body <text>            Set body text (for 'add')
-    \\    --tags <t1,t2>           Set tags comma-separated (for 'add')
-    \\    --status <s>             Filter by status: pending, in-progress, done
+    \\    --title <text>           Set title (for 'edit')
+    \\    --body <text>            Set body text (for 'add', 'edit')
+    \\    --tags <t1,t2>           Set tags comma-separated (for 'add', 'edit')
+    \\    --status <s>             Set/filter by status: pending, in-progress, done
     \\    --tag <tag>              Filter by tag
     \\    --blocked                Show only blocked todos
     \\    --unblocked              Show only unblocked todos
@@ -128,6 +131,8 @@ const HELP_TEXT =
     \\
     \\EXAMPLES:
     \\    mind add "Implement auth" --body "Add JWT authentication" --tags "feature,security"
+    \\    mind edit 1234567890-001 --title "Fix auth implementation"
+    \\    mind edit 1234567890-001 --status in-progress
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind show 1234567890-001
