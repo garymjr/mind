@@ -21,14 +21,18 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli.Args, store_path: []co
     }
 
     var tags_list = std.ArrayListUnmanaged([]const u8){};
-    defer tags_list.deinit(allocator);
+    defer {
+        for (tags_list.items) |tag| allocator.free(tag);
+        tags_list.deinit(allocator);
+    }
 
     if (args.tags) |tags_str| {
         var iter = std.mem.splitScalar(u8, tags_str, ',');
         while (iter.next()) |tag| {
             const trimmed = std.mem.trim(u8, tag, " ");
             if (trimmed.len > 0) {
-                try tags_list.append(allocator, trimmed);
+                const normalized = try util.normalizeNfc(allocator, trimmed);
+                try tags_list.append(allocator, normalized);
             }
         }
     }
@@ -109,9 +113,10 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
 
     // Update title
     if (args.title) |new_title| {
-        try util.validateTitle(new_title);
+        const normalized = try util.normalizeNfc(allocator, new_title);
+        try util.validateTitle(normalized);
         allocator.free(todo_list.todos[idx].title);
-        todo_list.todos[idx].title = try allocator.dupe(u8, new_title);
+        todo_list.todos[idx].title = normalized;
         modified = true;
     }
 
@@ -145,15 +150,18 @@ pub fn executeEdit(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
         while (iter.next()) |tag| {
             const trimmed = std.mem.trim(u8, tag, " ");
             if (trimmed.len > 0) {
-                try tags_list.append(allocator, trimmed);
+                // Normalize each tag
+                const normalized = try util.normalizeNfc(allocator, trimmed);
+                try tags_list.append(allocator, normalized);
             }
         }
 
         // Allocate new tags array
         var new_tags = try allocator.alloc([]const u8, tags_list.items.len);
         for (tags_list.items, 0..) |tag, i| {
-            new_tags[i] = try allocator.dupe(u8, tag);
+            new_tags[i] = tag;
         }
+        tags_list.items.len = 0; // Don't free - transferred to new_tags
         todo_list.todos[idx].tags = new_tags;
         modified = true;
     }
@@ -233,6 +241,13 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
     var todo_list = try st.load();
     defer todo_list.deinit();
 
+    // Normalize tag filter if present
+    const normalized_tag_filter = if (args.tag_filter) |filter_tag|
+        try util.normalizeNfc(allocator, filter_tag)
+    else
+        null;
+    defer if (normalized_tag_filter) |tag| allocator.free(tag);
+
     // Build filtered list
     var filtered = std.ArrayListUnmanaged(*const todo.Todo){};
     defer filtered.deinit(allocator);
@@ -246,8 +261,8 @@ pub fn executeList(allocator: std.mem.Allocator, args: cli.Args, store_path: []c
             }
         }
 
-        // Apply tag filter
-        if (args.tag_filter) |filter_tag| {
+        // Apply tag filter (tags are already normalized in storage)
+        if (normalized_tag_filter) |filter_tag| {
             var has_tag = false;
             for (item.tags) |tag| {
                 if (std.mem.eql(u8, tag, filter_tag)) {

@@ -178,12 +178,16 @@ pub fn createTodo(
     tags: []const []const u8,
     depends_on: []const []const u8,
 ) !Todo {
-    try util.validateTitle(title);
+    // Normalize title before validation
+    const normalized_title = try util.normalizeNfc(allocator, title);
+    errdefer allocator.free(normalized_title);
+
+    try util.validateTitle(normalized_title);
 
     const id = try util.generateId(allocator);
     errdefer allocator.free(id);
 
-    const title_copy = try allocator.dupe(u8, title);
+    const title_copy = normalized_title;
     errdefer allocator.free(title_copy);
 
     const body_copy = try allocator.dupe(u8, body);
@@ -195,7 +199,8 @@ pub fn createTodo(
         allocator.free(tags_copy);
     }
     for (tags, 0..) |tag, i| {
-        tags_copy[i] = try allocator.dupe(u8, tag);
+        const normalized_tag = try util.normalizeNfc(allocator, tag);
+        tags_copy[i] = normalized_tag;
     }
 
     var depends_copy = try allocator.alloc([]const u8, depends_on.len);

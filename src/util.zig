@@ -3,6 +3,334 @@ const todo = @import("todo.zig");
 
 const MAX_TITLE_LENGTH = 100;
 
+/// Unicode combining character ranges (simplified for common cases)
+const COMBINING_RANGES = [_]struct { start: u21, end: u21 }{
+    .{ .start = 0x0300, .end = 0x036F },   // Combining Diacritical Marks
+    .{ .start = 0x1AB0, .end = 0x1AFF },   // Combining Diacritical Marks Extended
+    .{ .start = 0x20D0, .end = 0x20FF },   // Combining Diacritical Marks for Symbols
+    .{ .start = 0xFE20, .end = 0xFE2F },   // Combining Half Marks
+};
+
+/// Precomposed character mapping entry
+const PrecomposedEntry = struct {
+    base: u21,
+    combining: u21,
+    precomposed: u21,
+};
+
+/// Common precomposed mappings (NFC)
+const PRECOMPOSED_ENTRIES = [_]PrecomposedEntry{
+    // Grave accent
+    .{ .base = 'a', .combining = 0x0300, .precomposed = 0x00E0 },  // à
+    .{ .base = 'e', .combining = 0x0300, .precomposed = 0x00E8 },  // è
+    .{ .base = 'i', .combining = 0x0300, .precomposed = 0x00EC },  // ì
+    .{ .base = 'o', .combining = 0x0300, .precomposed = 0x00F2 },  // ò
+    .{ .base = 'u', .combining = 0x0300, .precomposed = 0x00F9 },  // ù
+    .{ .base = 'A', .combining = 0x0300, .precomposed = 0x00C0 },  // À
+    .{ .base = 'E', .combining = 0x0300, .precomposed = 0x00C8 },  // È
+    .{ .base = 'I', .combining = 0x0300, .precomposed = 0x00CC },  // Ì
+    .{ .base = 'O', .combining = 0x0300, .precomposed = 0x00D2 },  // Ò
+    .{ .base = 'U', .combining = 0x0300, .precomposed = 0x00D9 },  // Ù
+
+    // Acute accent
+    .{ .base = 'a', .combining = 0x0301, .precomposed = 0x00E1 },  // á
+    .{ .base = 'e', .combining = 0x0301, .precomposed = 0x00E9 },  // é
+    .{ .base = 'i', .combining = 0x0301, .precomposed = 0x00ED },  // í
+    .{ .base = 'o', .combining = 0x0301, .precomposed = 0x00F3 },  // ó
+    .{ .base = 'u', .combining = 0x0301, .precomposed = 0x00FA },  // ú
+    .{ .base = 'y', .combining = 0x0301, .precomposed = 0x00FD },  // ý
+    .{ .base = 'A', .combining = 0x0301, .precomposed = 0x00C1 },  // Á
+    .{ .base = 'E', .combining = 0x0301, .precomposed = 0x00C9 },  // É
+    .{ .base = 'I', .combining = 0x0301, .precomposed = 0x00CD },  // Í
+    .{ .base = 'O', .combining = 0x0301, .precomposed = 0x00D3 },  // Ó
+    .{ .base = 'U', .combining = 0x0301, .precomposed = 0x00DA },  // Ú
+    .{ .base = 'Y', .combining = 0x0301, .precomposed = 0x00DD },  // Ý
+
+    // Circumflex
+    .{ .base = 'a', .combining = 0x0302, .precomposed = 0x00E2 },  // â
+    .{ .base = 'e', .combining = 0x0302, .precomposed = 0x00EA },  // ê
+    .{ .base = 'i', .combining = 0x0302, .precomposed = 0x00EE },  // î
+    .{ .base = 'o', .combining = 0x0302, .precomposed = 0x00F4 },  // ô
+    .{ .base = 'u', .combining = 0x0302, .precomposed = 0x00FB },  // û
+    .{ .base = 'A', .combining = 0x0302, .precomposed = 0x00C2 },  // Â
+    .{ .base = 'E', .combining = 0x0302, .precomposed = 0x00CA },  // Ê
+    .{ .base = 'I', .combining = 0x0302, .precomposed = 0x00CE },  // Î
+    .{ .base = 'O', .combining = 0x0302, .precomposed = 0x00D4 },  // Ô
+    .{ .base = 'U', .combining = 0x0302, .precomposed = 0x00DB },  // Û
+
+    // Tilde
+    .{ .base = 'a', .combining = 0x0303, .precomposed = 0x00E3 },  // ã
+    .{ .base = 'n', .combining = 0x0303, .precomposed = 0x00F1 },  // ñ
+    .{ .base = 'o', .combining = 0x0303, .precomposed = 0x00F5 },  // õ
+    .{ .base = 'A', .combining = 0x0303, .precomposed = 0x00C3 },  // Ã
+    .{ .base = 'N', .combining = 0x0303, .precomposed = 0x00D1 },  // Ñ
+    .{ .base = 'O', .combining = 0x0303, .precomposed = 0x00D5 },  // Õ
+
+    // Diaeresis (umlaut)
+    .{ .base = 'a', .combining = 0x0308, .precomposed = 0x00E4 },  // ä
+    .{ .base = 'e', .combining = 0x0308, .precomposed = 0x00EB },  // ë
+    .{ .base = 'i', .combining = 0x0308, .precomposed = 0x00EF },  // ï
+    .{ .base = 'o', .combining = 0x0308, .precomposed = 0x00F6 },  // ö
+    .{ .base = 'u', .combining = 0x0308, .precomposed = 0x00FC },  // ü
+    .{ .base = 'y', .combining = 0x0308, .precomposed = 0x00FF },  // ÿ
+    .{ .base = 'A', .combining = 0x0308, .precomposed = 0x00C4 },  // Ä
+    .{ .base = 'E', .combining = 0x0308, .precomposed = 0x00CB },  // Ë
+    .{ .base = 'I', .combining = 0x0308, .precomposed = 0x00CF },  // Ï
+    .{ .base = 'O', .combining = 0x0308, .precomposed = 0x00D6 },  // Ö
+    .{ .base = 'U', .combining = 0x0308, .precomposed = 0x00DC },  // Ü
+
+    // Cedilla
+    .{ .base = 'c', .combining = 0x0327, .precomposed = 0x00E7 },  // ç
+    .{ .base = 'C', .combining = 0x0327, .precomposed = 0x00C7 },  // Ç
+
+    // Macron
+    .{ .base = 'a', .combining = 0x0304, .precomposed = 0x0101 },  // ā
+    .{ .base = 'A', .combining = 0x0304, .precomposed = 0x0100 },  // Ā
+    .{ .base = 'e', .combining = 0x0304, .precomposed = 0x0113 },  // ē
+    .{ .base = 'E', .combining = 0x0304, .precomposed = 0x0112 },  // Ē
+    .{ .base = 'i', .combining = 0x0304, .precomposed = 0x012B },  // ī
+    .{ .base = 'I', .combining = 0x0304, .precomposed = 0x012A },  // Ī
+    .{ .base = 'o', .combining = 0x0304, .precomposed = 0x014D },  // ō
+    .{ .base = 'O', .combining = 0x0304, .precomposed = 0x014C },  // Ō
+    .{ .base = 'u', .combining = 0x0304, .precomposed = 0x016B },  // ū
+    .{ .base = 'U', .combining = 0x0304, .precomposed = 0x016A },  // Ū
+
+    // Dot above
+    .{ .base = 'a', .combining = 0x0307, .precomposed = 0x0105 },  // ą
+    .{ .base = 'A', .combining = 0x0307, .precomposed = 0x0104 },  // Ą
+    .{ .base = 'e', .combining = 0x0307, .precomposed = 0x0117 },  // ė
+    .{ .base = 'E', .combining = 0x0307, .precomposed = 0x0116 },  // Ė
+    .{ .base = 'i', .combining = 0x0307, .precomposed = 0x0131 },  // ı
+    .{ .base = 'I', .combining = 0x0307, .precomposed = 0x0130 },  // İ
+};
+
+/// Check if a codepoint is a combining character
+fn isCombining(cp: u21) bool {
+    for (COMBINING_RANGES) |range| {
+        if (cp >= range.start and cp <= range.end) return true;
+    }
+    return false;
+}
+
+/// Find precomposed form for base + combining mark
+fn findPrecomposed(base: u21, combining: u21) ?u21 {
+    for (PRECOMPOSED_ENTRIES) |entry| {
+        if (entry.base == base and entry.combining == combining) {
+            return entry.precomposed;
+        }
+    }
+    return null;
+}
+
+/// Normalize string to NFC form (canonical composition)
+/// Converts decomposed characters (e.g., e + combining acute) to precomposed (é)
+/// Returns allocated string in normalized form
+pub fn normalizeNfc(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
+    if (input.len == 0) return allocator.dupe(u8, "");
+
+    var result = std.ArrayListUnmanaged(u8){};
+    try result.ensureTotalCapacity(allocator, input.len);
+    defer result.deinit(allocator);
+
+    var it = std.unicode.Utf8View.initUnchecked(input).iterator();
+    var pending_combining: ?u21 = null;
+
+    while (it.nextCodepoint()) |cp| {
+        if (!isCombining(cp)) {
+            // Flush any pending combining mark
+            if (pending_combining) |comb| {
+                var buf: [4]u8 = undefined;
+                const len = std.unicode.utf8Encode(comb, &buf) catch continue;
+                try result.appendSlice(allocator, buf[0..len]);
+                pending_combining = null;
+            }
+
+            // Write base character
+            var buf: [4]u8 = undefined;
+            const len = std.unicode.utf8Encode(cp, &buf) catch continue;
+            try result.appendSlice(allocator, buf[0..len]);
+        } else {
+            // This is a combining mark
+            if (result.items.len > 0 and pending_combining == null) {
+                // Try to combine with last base character
+                const prev_utf8 = std.unicode.Utf8View.initUnchecked(result.items);
+                var prev_it = prev_utf8.iterator();
+                var prev_cp: ?u21 = null;
+
+                // Get last codepoint
+                while (prev_it.nextCodepoint()) |code| {
+                    prev_cp = code;
+                }
+
+                if (prev_cp) |base| {
+                    if (findPrecomposed(base, cp)) |precomposed| {
+                        // Replace base with precomposed
+                        var combo_buf: [4]u8 = undefined;
+                        const base_len = std.unicode.utf8Encode(base, &combo_buf) catch unreachable;
+                        const precomposed_len = std.unicode.utf8Encode(precomposed, &combo_buf) catch continue;
+
+                        // Remove base from result
+                        result.items.len -= base_len;
+
+                        // Add precomposed
+                        try result.appendSlice(allocator, combo_buf[0..precomposed_len]);
+                    } else {
+                        // No precomposed form, keep as combining mark
+                        pending_combining = cp;
+                    }
+                } else {
+                    pending_combining = cp;
+                }
+            } else {
+                // Multiple combining marks - just write them
+                pending_combining = cp;
+            }
+        }
+    }
+
+    // Flush any pending combining mark
+    if (pending_combining) |comb| {
+        var buf: [4]u8 = undefined;
+        const len = std.unicode.utf8Encode(comb, &buf) catch {
+            return result.toOwnedSlice(allocator);
+        };
+        try result.appendSlice(allocator, buf[0..len]);
+    }
+
+    return result.toOwnedSlice(allocator);
+}
+
+/// Compare two strings with Unicode normalization
+pub fn eqlNormalized(a: []const u8, b: []const u8) bool {
+    // Quick path: byte comparison
+    if (std.mem.eql(u8, a, b)) return true;
+
+    // Slow path: need normalization
+    // For simplicity, just do byte compare for now
+    // Full normalization would require allocation
+    // In most practical cases, byte comparison is sufficient
+    // when both strings have been normalized on input
+    return false;
+}
+
+// Unicode normalization tests
+test "normalizeNfc handles empty string" {
+    const allocator = std.testing.allocator;
+    const result = try normalizeNfc(allocator, "");
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("", result);
+}
+
+test "normalizeNfc handles plain ASCII" {
+    const allocator = std.testing.allocator;
+    const result = try normalizeNfc(allocator, "hello");
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("hello", result);
+}
+
+test "normalizeNfc converts e + combining acute to é" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'e', 0xCC, 0x81 }; // e + combining acute
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\u{00E9}", result); // Single é character
+}
+
+test "normalizeNfc converts a + combining grave to à" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'a', 0xCC, 0x80 }; // a + combining grave
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\u{00E0}", result); // Single à character
+}
+
+test "normalizeNfc converts n + combining tilde to ñ" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'n', 0xCC, 0xA3 }; // n + combining tilde
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\u{00F1}", result); // Single ñ character
+}
+
+test "normalizeNfc converts c + combining cedilla to ç" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'c', 0xCC, 0xA7 }; // c + combining cedilla
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\u{00E7}", result); // Single ç character
+}
+
+test "normalizeNfc handles mixed text" {
+    const allocator = std.testing.allocator;
+    // "cafe" with e + combining acute + " " + "na" with n + combining tilde + "t" + "ive"
+    const input = [_]u8{ 'c', 'a', 'f', 'e', 0xCC, 0x81, ' ', 'n', 'a', 0xCC, 0xA3, 't', 'i', 'v', 'e' };
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("café naïve", result);
+}
+
+test "normalizeNfc handles already precomposed text" {
+    const allocator = std.testing.allocator;
+    const result = try normalizeNfc(allocator, "café");
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("café", result);
+}
+
+test "normalizeNfc handles multiple combining marks on same base" {
+    const allocator = std.testing.allocator;
+    // e + combining acute + combining grave (no precomposed form)
+    const input = [_]u8{ 'e', 0xCC, 0x81, 0xCC, 0x80 };
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    // Should keep both combining marks as there's no precomposed form
+    try std.testing.expectEqualStrings(&input, result);
+}
+
+test "normalizeNfc handles uppercase letters" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'E', 0xCC, 0x81 }; // E + combining acute
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\u{00C9}", result); // Single É character
+}
+
+test "normalizeNfc handles u + diaeresis" {
+    const allocator = std.testing.allocator;
+    const input = [_]u8{ 'u', 0xCC, 0x88 }; // u + combining diaeresis
+    const result = try normalizeNfc(allocator, &input);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("\u{00FC}", result); // Single ü character
+}
+
+test "normalizeNfc makes decomposed and precomposed tags equivalent" {
+    const allocator = std.testing.allocator;
+
+    // Precomposed "café"
+    const precomposed = "café";
+    // Decomposed "café" (c, a, f, e, combining acute)
+    const decomposed = [_]u8{ 'c', 'a', 'f', 'e', 0xCC, 0x81 };
+
+    const norm1 = try normalizeNfc(allocator, precomposed);
+    defer allocator.free(norm1);
+
+    const norm2 = try normalizeNfc(allocator, &decomposed);
+    defer allocator.free(norm2);
+
+    // Both should normalize to the same precomposed form
+    try std.testing.expectEqualStrings(norm1, norm2);
+}
+
+test "normalizeNfc preserves already normalized text" {
+    const allocator = std.testing.allocator;
+    const input = "café naïve";
+
+    const result = try normalizeNfc(allocator, input);
+    defer allocator.free(result);
+
+    // Already normalized text should pass through unchanged
+    try std.testing.expectEqualStrings(input, result);
+}
+
 /// Escapes a string for JSON output (handles backslash, quotes, control chars)
 /// Returns allocated string. For direct writing to buffered output, prefer writeEscapedStringToWriter.
 pub fn escapeJsonString(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {

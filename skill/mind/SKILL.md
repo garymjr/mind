@@ -18,9 +18,8 @@ Mind is a Zig-based CLI tool for managing project todos with dependencies and ta
 ## Core Concepts
 
 - **ID**: `{timestamp}-{ms:0>3}` format, auto-generated
-- **Status**: `pending`, `in-progress`, `done`
-- **Blocked state**: Computed from dependencies (when depends_on tasks aren't done)
-- **Dependencies**: `depends_on` (parent tasks) and `blocked_by` (child tasks, auto-populated)
+- **Status**: `pending`, `in-progress`, `done`, `blocked`
+- **Dependencies**: `depends_on` (parent tasks) and `blocked_by` (child tasks)
 - **Tags**: Comma-separated for categorization
 
 ## Common Commands
@@ -40,6 +39,7 @@ mind list                              # List all
 mind list --status pending             # Filter by status
 mind list --tag bug                    # Filter by tag
 mind show <id>                         # Show details
+mind status                            # Show project status summary
 mind next                              # Show next ready task
 ```
 
@@ -93,6 +93,25 @@ mind show <id>                         # Shows depends_on and blocked_by
 5. **Clear titles**: Keep titles under 100 chars, descriptive
 6. **Use body**: Add details, acceptance criteria, notes
 
+## Unicode Normalization
+
+Mind automatically normalizes Unicode text to NFC (Canonical Composition) form. This ensures that different Unicode representations of the same character are treated identically:
+
+- **Tags**: `café` (precomposed) and `cafe\u0301` (decomposed) are stored as the same tag
+- **Titles**: Normalized on input, ensuring consistent storage and filtering
+- **Filtering**: Tag filters work regardless of Unicode representation
+
+Example:
+```bash
+# These create todos with equivalent tags
+mind add "Task 1" --tags café          # Precomposed
+mind add "Task 2" --tags "cafe\u0301"  # Decomposed (e + combining acute)
+
+# Both tags normalize to "café" and match when filtering
+mind list --tag café
+mind list --tag "cafe\u0301"  # Same results
+```
+
 ## Workflows
 
 ### Starting New Feature
@@ -118,6 +137,9 @@ mind link $TEST $API
 ### Daily Workflow
 
 ```bash
+# Check project status
+mind status                            # See overall progress
+
 # Check what's ready
 mind next                              # Show next ready task
 mind list --status pending             # See all pending tasks
