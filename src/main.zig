@@ -140,22 +140,12 @@ const HELP_TEXT =
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
     \\    unlink <id> --from <id>  Remove dependency link
-    \\    delete <id> [--force]    Delete a todo
-    \\    remove <id> [--force]    Alias for delete
+    \\    delete <id>              Delete a todo
+    \\    remove <id>              Alias for delete
     \\    help [command]           Show help for command
     \\
     \\FLAGS:
-    \\    --title <text>           Set title (for 'edit')
-    \\    --body <text>            Set body text (for 'add', 'edit')
-    \\    --tags, -t <t1,t2>       Set tags comma-separated (for 'add', 'edit')
-    \\    --status, -s <s>         Set/filter by status: pending, in-progress, done
-    \\    --tag <tag>              Filter by tag
-    \\    --blocked                Show only blocked todos
-    \\    --unblocked              Show only unblocked todos
-    \\    --all                    Show all unblocked todos (for 'next')
-    \\    --reason <text>          Set resolution reason (for 'done')
-    \\    --json                   Output as JSON
-    \\    --help, -h               Show this help
+    \\    --help, -h               Show help
     \\
     \\EXAMPLES:
     \\    mind add "Implement auth" --body "Add JWT authentication" --tags "feature,security"
@@ -173,6 +163,8 @@ const HELP_TEXT =
     \\
     \\STORAGE:
     \\    Todos stored in .mind/mind.json (version control friendly)
+    \\
+    \\Use 'mind help <command>' for command-specific flags and options.
     \\
     \\
 ;
