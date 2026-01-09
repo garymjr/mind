@@ -468,7 +468,6 @@ pub fn writeTodosJson(writer: anytype, allocator: std.mem.Allocator, todos: []co
 // Sequence state for collision prevention
 const IDState = struct {
     last_timestamp: i64 = 0,
-    last_ms: u32 = 0,
     sequence: u32 = 0,
 };
 
@@ -478,19 +477,13 @@ var id_state_mutex = std.Thread.Mutex{};
 pub fn generateId(allocator: std.mem.Allocator) ![]const u8 {
     const timestamp = std.time.timestamp();
 
-    // Get milliseconds from nanosecond timestamp
-    // Use @mod instead of @rem to handle negative values correctly
-    const ns = std.time.nanoTimestamp();
-    const ms = @as(u32, @intCast(@divTrunc(@mod(ns, 1_000_000_000), 1_000_000)));
-
     // Atomically get sequence number to prevent collisions
     const sequence = blk: {
         id_state_mutex.lock();
         defer id_state_mutex.unlock();
 
-        if (timestamp != id_state.last_timestamp or ms != id_state.last_ms) {
+        if (timestamp != id_state.last_timestamp) {
             id_state.last_timestamp = timestamp;
-            id_state.last_ms = ms;
             id_state.sequence = 0;
         }
 
@@ -499,8 +492,8 @@ pub fn generateId(allocator: std.mem.Allocator) ![]const u8 {
         break :blk seq;
     };
 
-    // Format: {timestamp}-{ms:0>3}-{seq:0>3}
-    return std.fmt.allocPrint(allocator, "{d}-{d:0>3}-{d:0>3}", .{ timestamp, ms, sequence });
+    // Format: {timestamp}-{seq:0>3}
+    return std.fmt.allocPrint(allocator, "{d}-{d:0>3}", .{ timestamp, sequence });
 }
 
 pub fn getCurrentTimestamp(allocator: std.mem.Allocator) ![]const u8 {
@@ -513,16 +506,15 @@ pub fn validateTitle(title: []const u8) error{TitleEmpty, TitleTooLong}!void {
     if (title.len > MAX_TITLE_LENGTH) return error.TitleTooLong;
 }
 
-/// Validates ID format: {timestamp}-{ms:0>3}-{seq:0>3}
-/// Example: "1736205028-001-001"
+/// Validates ID format: {timestamp}-{seq:0>3}
+/// Example: "1736205028-001"
 pub fn validateId(id: []const u8) error{IdInvalidFormat}!void {
-    // Split into 3 parts by '-'
+    // Split into 2 parts by '-'
     var parts = std.mem.splitScalar(u8, id, '-');
     const timestamp_part = parts.next() orelse return error.IdInvalidFormat;
-    const ms_part = parts.next() orelse return error.IdInvalidFormat;
     const seq_part = parts.next() orelse return error.IdInvalidFormat;
 
-    // Should have exactly 3 parts
+    // Should have exactly 2 parts
     if (parts.next() != null) return error.IdInvalidFormat;
 
     // Timestamp must be non-empty and all digits
@@ -531,13 +523,9 @@ pub fn validateId(id: []const u8) error{IdInvalidFormat}!void {
         if (c < '0' or c > '9') return error.IdInvalidFormat;
     }
 
-    // ms and seq must be exactly 3 digits
-    if (ms_part.len != 3) return error.IdInvalidFormat;
+    // seq must be exactly 3 digits
     if (seq_part.len != 3) return error.IdInvalidFormat;
 
-    for (ms_part) |c| {
-        if (c < '0' or c > '9') return error.IdInvalidFormat;
-    }
     for (seq_part) |c| {
         if (c < '0' or c > '9') return error.IdInvalidFormat;
     }
@@ -557,11 +545,11 @@ test "validateTitle rejects too long title" {
 }
 
 test "validateId accepts valid ID" {
-    try validateId("1736205028-001-001");
+    try validateId("1736205028-001");
 }
 
 test "validateId accepts valid ID with leading zeros" {
-    try validateId("1736205028-000-000");
+    try validateId("1736205028-000");
 }
 
 test "validateId rejects empty string" {
@@ -569,37 +557,24 @@ test "validateId rejects empty string" {
 }
 
 test "validateId rejects ID without dashes" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028001001"));
-}
-
-test "validateId rejects ID with only one dash" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028001"));
 }
 
 test "validateId rejects ID with too many dashes" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-001-001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-001"));
 }
 
 test "validateId rejects ID with non-digit timestamp" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("abc-001-001"));
-}
-
-test "validateId rejects ID with non-digit ms" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-abc-001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("abc-001"));
 }
 
 test "validateId rejects ID with non-digit seq" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-abc"));
-}
-
-test "validateId rejects ID with wrong ms length" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-1-001"));
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-00123-001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-abc"));
 }
 
 test "validateId rejects ID with wrong seq length" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-1"));
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-00123"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-1"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-00123"));
 }
 
 test "generateId produces unique IDs" {
@@ -622,16 +597,14 @@ test "generateId format" {
     const id = try generateId(allocator);
     defer allocator.free(id);
 
-    // Should match format: {timestamp}-{ms:0>3}-{seq:0>3}
+    // Should match format: {timestamp}-{seq:0>3}
     var parts = std.mem.splitScalar(u8, id, '-');
     const timestamp_part = parts.next().?;
-    const ms_part = parts.next().?;
     const seq_part = parts.next().?;
     try std.testing.expect(parts.next() == null); // No more parts
 
     // Verify parts are non-empty
     try std.testing.expect(timestamp_part.len > 0);
-    try std.testing.expectEqual(@as(usize, 3), ms_part.len);
     try std.testing.expectEqual(@as(usize, 3), seq_part.len);
 }
 

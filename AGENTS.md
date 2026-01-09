@@ -55,7 +55,7 @@ src/
 **Key patterns:**
 - Manual JSON formatting (diff-friendly)
 - Error messages to stderr, `std.process.exit(1)`
-- ID format: `{timestamp}-{ms:0>3}`
+- ID format: `{timestamp}-{seq:0>3}`
 - Buffered writers for stdout/stderr
 
 ## Storage
@@ -64,7 +64,7 @@ src/
 ```json
 {
   "todos": [{
-    "id": "1736205028-001",
+    "id": "1736205028-000",
     "title": "...",
     "body": "...",
     "status": "pending",

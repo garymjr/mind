@@ -17,7 +17,7 @@ Mind is a Zig-based CLI tool for managing project todos with dependencies and ta
 
 ## Core Concepts
 
-- **ID**: `{timestamp}-{ms:0>3}` format, auto-generated
+- **ID**: `{timestamp}-{seq:0>3}` format, auto-generated
 - **Status**: `pending`, `in-progress`, `done`, `blocked`
 - **Priority**: `low`, `medium`, `high`, `critical` (default: medium)
 - **Dependencies**: `depends_on` (parent tasks) and `blocked_by` (child tasks)
@@ -41,7 +41,7 @@ Use `--quiet` to get just the ID for capture in scripts:
 
 ```bash
 ID=$(mind add "New task" --quiet)
-# $ID now contains: 1736205028-001
+# $ID now contains: 1736205028-000
 mind edit $ID --status in-progress
 ```
 
@@ -269,7 +269,7 @@ just check             # Build + test
 {
   "todos": [
     {
-      "id": "1736205028-001",
+      "id": "1736205028-000",
       "title": "Task name",
       "status": "pending",
       "priority": "high"
@@ -283,7 +283,7 @@ just check             # Build + test
 
 ```json
 {
-  "marked": ["1736205028-001", "1736205028-002"],
+  "marked": ["1736205028-000", "1736205028-001"],
   "count": 2,
   "errors": 0
 }
@@ -296,7 +296,7 @@ Data stored in `.mind/mind.json`:
 ```json
 {
   "todos": [{
-    "id": "1736205028-001",
+    "id": "1736205028-000",
     "title": "...",
     "body": "...",
     "status": "pending",
