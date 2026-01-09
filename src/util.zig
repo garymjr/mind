@@ -1,7 +1,7 @@
 const std = @import("std");
 const todo = @import("todo.zig");
 
-const MAX_TITLE_LENGTH = 100;
+pub const MAX_TITLE_LENGTH = 100;
 
 /// Unicode combining character ranges (simplified for common cases)
 const COMBINING_RANGES = [_]struct { start: u21, end: u21 }{

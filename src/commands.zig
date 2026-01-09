@@ -8,13 +8,29 @@ const storage = @import("storage.zig");
 const BODY_HINT = "Tip: Add a body with --body to provide context for this todo";
 
 pub fn executeAdd(allocator: std.mem.Allocator, args: cli_args.Add.Args, store_path: []const u8) !void {
-    const stdout = std.fs.File.stdout();
-    const stderr = std.fs.File.stderr();
+    var stdout_buf: [65536]u8 = undefined;
+    var stderr_buf: [65536]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&stdout_buf);
+    var stderr = std.fs.File.stderr().writer(&stderr_buf);
+    errdefer stdout.end() catch {};
+    errdefer stderr.end() catch {};
 
     if (args.title.len == 0) {
-        try stderr.writeAll("error: title cannot be empty\n");
+        try stderr.interface.writeAll("error: title cannot be empty\n");
         return error.TitleEmpty;
     }
+
+    // Normalize and validate title length
+    const normalized_title = try util.normalizeNfc(allocator, args.title);
+    defer allocator.free(normalized_title);
+
+    util.validateTitle(normalized_title) catch |err| {
+        if (err == error.TitleTooLong) {
+            try stderr.interface.print("error: title too long ({d} chars, max {d} chars)\n", .{ normalized_title.len, util.MAX_TITLE_LENGTH });
+        }
+        try stderr.end();
+        std.process.exit(1);
+    };
 
     var tags_list = std.ArrayListUnmanaged([]const u8){};
     defer {
@@ -40,7 +56,7 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli_args.Add.Args, store_p
 
     const new_todo = try todo.createTodo(
         allocator,
-        args.title,
+        normalized_title,
         body,
         priority,
         tags_list.items,
@@ -53,28 +69,28 @@ pub fn executeAdd(allocator: std.mem.Allocator, args: cli_args.Add.Args, store_p
 
     try todo_list.add(new_todo);
     st.save(&todo_list) catch |err| {
-        var buf: [128]u8 = undefined;
-        const msg = try std.fmt.bufPrint(&buf, "Save error: {}\n", .{err});
-        try stderr.writeAll(msg);
+        try stderr.interface.print("Save error: {}\n", .{err});
         return err;
     };
 
     if (args.quiet) {
-        try stdout.writeAll(new_todo.id);
-        try stdout.writeAll("\n");
+        try stdout.interface.writeAll(new_todo.id);
+        try stdout.interface.writeAll("\n");
     } else {
-        try stdout.writeAll("Created todo: ");
-        try stdout.writeAll(new_todo.id);
-        try stdout.writeAll("\n  ");
-        try stdout.writeAll(new_todo.title);
-        try stdout.writeAll("\n");
+        try stdout.interface.writeAll("Created todo: ");
+        try stdout.interface.writeAll(new_todo.id);
+        try stdout.interface.writeAll("\n  ");
+        try stdout.interface.writeAll(new_todo.title);
+        try stdout.interface.writeAll("\n");
 
         if (body.len == 0) {
-            try stdout.writeAll("\n");
-            try stdout.writeAll(BODY_HINT);
-            try stdout.writeAll("\n");
+            try stdout.interface.writeAll("\n");
+            try stdout.interface.writeAll(BODY_HINT);
+            try stdout.interface.writeAll("\n");
         }
     }
+
+    try stdout.end();
 }
 
 pub fn executeEdit(allocator: std.mem.Allocator, args: cli_args.Edit.Args, store_path: []const u8) !void {
