@@ -55,7 +55,7 @@ src/
 **Key patterns:**
 - Manual JSON formatting (diff-friendly)
 - Error messages to stderr, `std.process.exit(1)`
-- ID format: `{timestamp}-{seq:0>3}`
+- ID format: `{basename}-{hex_seq}` (new) or `{timestamp}-{seq:0>3}` (old, for backward compatibility)
 - Buffered writers for stdout/stderr
 
 ## Storage
@@ -64,7 +64,7 @@ src/
 ```json
 {
   "todos": [{
-    "id": "1736205028-000",
+    "id": "mind-0000000a",
     "title": "...",
     "body": "...",
     "status": "pending",
@@ -77,6 +77,19 @@ src/
   }]
 }
 ```
+
+## ID Format
+
+New format: `{basename}-{hex_seq}`
+- `basename`: Git repository basename (e.g., "mind")
+- `hex_seq`: 1-8 character lowercase hexadecimal sequence (e.g., "a", "ff", "123")
+- Example: `mind-a`, `mind-ff`, `mind-123`
+- Sequence stored in `.mind/.seq` (decimal format)
+- Leading zeros trimmed for brevity (e.g., 12 → "c", not "0000000c")
+
+Old format: `{timestamp}-{seq:0>3}` (still accepted for backward compatibility)
+- Example: `1736205028-001`
+- New todos use new format; old todos can still be edited/managed
 
 ## Constants
 

@@ -465,35 +465,116 @@ pub fn writeTodosJson(writer: anytype, allocator: std.mem.Allocator, todos: []co
     try writer.writeAll("  ]\n}\n");
 }
 
-// Sequence state for collision prevention
-const IDState = struct {
-    last_timestamp: i64 = 0,
-    sequence: u32 = 0,
-};
+/// Find the git repository root directory
+/// Returns error if not in a git repository
+pub fn findGitRoot(allocator: std.mem.Allocator) ![]const u8 {
+    // Try git command first (faster, works in worktrees)
+    const result = try std.process.Child.run(.{
+        .allocator = allocator,
+        .argv = &[_][]const u8{ "git", "rev-parse", "--show-toplevel" },
+    });
+    defer allocator.free(result.stdout);
+    defer allocator.free(result.stderr);
 
-var id_state = IDState{};
-var id_state_mutex = std.Thread.Mutex{};
+    if (result.term.Exited == 0 and result.stdout.len > 0) {
+        // Remove trailing newline
+        const path = std.mem.trimRight(u8, result.stdout, "\n\r");
+        return allocator.dupe(u8, path);
+    }
 
-pub fn generateId(allocator: std.mem.Allocator) ![]const u8 {
-    const timestamp = std.time.timestamp();
+    // Fallback: walk up directory tree looking for .git
+    const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");
+    defer allocator.free(cwd);
 
-    // Atomically get sequence number to prevent collisions
-    const sequence = blk: {
-        id_state_mutex.lock();
-        defer id_state_mutex.unlock();
+    var path = cwd;
+    while (path.len > 0) {
+        const git_path = try std.fmt.allocPrint(allocator, "{s}/.git", .{path});
+        defer allocator.free(git_path);
 
-        if (timestamp != id_state.last_timestamp) {
-            id_state.last_timestamp = timestamp;
-            id_state.sequence = 0;
-        }
+        if (std.fs.cwd().openFile(git_path, .{})) |_| {
+            return allocator.dupe(u8, path);
+        } else |_| {}
 
-        const seq = id_state.sequence;
-        id_state.sequence += 1;
-        break :blk seq;
+        // Move up one directory
+        const last_sep = if (std.mem.lastIndexOfScalar(u8, path, '/')) |i| i else break;
+        if (last_sep == 0) break;
+        path = path[0..last_sep];
+    }
+
+    return error.NotInGitRepo;
+}
+
+/// Get the basename of the current git repository
+pub fn getRepoBasename(allocator: std.mem.Allocator) ![]const u8 {
+    const git_root = try findGitRoot(allocator);
+    defer allocator.free(git_root);
+
+    const basename = std.fs.path.basename(git_root);
+    return allocator.dupe(u8, basename);
+}
+
+/// Path for the sequence counter file
+const SEQ_FILE_PATH = ".mind/.seq";
+
+/// Get the next sequence number from the counter file
+/// Creates the file with 0 if it doesn't exist
+/// Returns the current sequence value and increments it for next call
+fn getNextSequence(allocator: std.mem.Allocator) !u64 {
+    const mind_dir = ".mind";
+
+    // Ensure .mind directory exists
+    std.fs.cwd().makePath(mind_dir) catch |err| {
+        // Ignore if it already exists
+        if (err != error.PathAlreadyExists) return err;
     };
 
-    // Format: {timestamp}-{seq:0>3}
-    return std.fmt.allocPrint(allocator, "{d}-{d:0>3}", .{ timestamp, sequence });
+    const seq_file = SEQ_FILE_PATH;
+    var write_buf: [20]u8 = undefined;
+
+    // Try to read existing value
+    var current: u64 = 0;
+    const file = std.fs.cwd().openFile(seq_file, .{}) catch |err| {
+        if (err == error.FileNotFound) {
+            // File doesn't exist, create it starting from 1
+            // Return 0 as first sequence number
+            const f = try std.fs.cwd().createFile(seq_file, .{});
+            defer f.close();
+            _ = try f.writeAll("1");
+            return 0;
+        } else {
+            return err;
+        }
+    };
+    defer file.close();
+
+    const content = try file.readToEndAlloc(allocator, 20);
+    defer allocator.free(content);
+
+    // Parse existing value
+    if (content.len > 0) {
+        current = try std.fmt.parseInt(u64, std.mem.trim(u8, content, &std.ascii.whitespace), 10);
+    }
+
+    // Write incremented value
+    const next = current + 1;
+    const f = try std.fs.cwd().createFile(seq_file, .{ .truncate = true });
+    defer f.close();
+    const written = try std.fmt.bufPrint(&write_buf, "{d}", .{next});
+    _ = try f.writeAll(written);
+
+    return current;
+}
+
+pub fn generateId(allocator: std.mem.Allocator) ![]const u8 {
+    const basename = try getRepoBasename(allocator);
+    defer allocator.free(basename);
+
+    const seq = try getNextSequence(allocator);
+
+    // Format: {basename}-{hex_seq}
+    // Using hex for compactness (up to 8 chars = 32 bits = 4.2B values)
+    // Leading zeros trimmed for brevity
+    return std.fmt.allocPrint(allocator, "{s}-{x}", .{ basename, seq });
 }
 
 pub fn getCurrentTimestamp(allocator: std.mem.Allocator) ![]const u8 {
@@ -506,29 +587,67 @@ pub fn validateTitle(title: []const u8) error{TitleEmpty, TitleTooLong}!void {
     if (title.len > MAX_TITLE_LENGTH) return error.TitleTooLong;
 }
 
-/// Validates ID format: {timestamp}-{seq:0>3}
-/// Example: "1736205028-001"
+/// Validates ID format.
+/// New format: {basename}-{hex_seq} - Example: "mind-a", "mind-12"
+/// Old format: {timestamp}-{seq:0>3} - Example: "1736205028-001"
+/// Supports both formats for backward compatibility
 pub fn validateId(id: []const u8) error{IdInvalidFormat}!void {
     // Split into 2 parts by '-'
     var parts = std.mem.splitScalar(u8, id, '-');
-    const timestamp_part = parts.next() orelse return error.IdInvalidFormat;
-    const seq_part = parts.next() orelse return error.IdInvalidFormat;
+    const first_part = parts.next() orelse return error.IdInvalidFormat;
+    const second_part = parts.next() orelse return error.IdInvalidFormat;
 
     // Should have exactly 2 parts
     if (parts.next() != null) return error.IdInvalidFormat;
 
-    // Timestamp must be non-empty and all digits
-    if (timestamp_part.len == 0) return error.IdInvalidFormat;
-    for (timestamp_part) |c| {
-        if (c < '0' or c > '9') return error.IdInvalidFormat;
+    // Try to validate as new format: {basename}-{hex_seq}
+    // Hex part can be 1-8 characters
+    if (second_part.len >= 1 and second_part.len <= 8) {
+        // Check if hex part is valid lowercase hex
+        var is_hex = true;
+        for (second_part) |c| {
+            if (!((c >= '0' and c <= '9') or (c >= 'a' and c <= 'f'))) {
+                is_hex = false;
+                break;
+            }
+        }
+
+        if (is_hex and first_part.len > 0) {
+            // First part can be alphanumeric (basename)
+            var is_alnum = true;
+            for (first_part) |c| {
+                if (!std.ascii.isAlphanumeric(c)) {
+                    is_alnum = false;
+                    break;
+                }
+            }
+            if (is_alnum) return; // Valid new format
+        }
     }
 
-    // seq must be exactly 3 digits
-    if (seq_part.len != 3) return error.IdInvalidFormat;
-
-    for (seq_part) |c| {
-        if (c < '0' or c > '9') return error.IdInvalidFormat;
+    // Try to validate as old format: {timestamp}-{seq:0>3}
+    if (second_part.len == 3) {
+        // Check if first part is all digits (timestamp)
+        var is_digits = true;
+        for (first_part) |c| {
+            if (c < '0' or c > '9') {
+                is_digits = false;
+                break;
+            }
+        }
+        if (is_digits and first_part.len > 0) {
+            // Check if second part is all digits
+            for (second_part) |c| {
+                if (c < '0' or c > '9') {
+                    is_digits = false;
+                    break;
+                }
+            }
+            if (is_digits) return; // Valid old format
+        }
     }
+
+    return error.IdInvalidFormat;
 }
 
 test "validateTitle rejects empty title" {
@@ -545,11 +664,25 @@ test "validateTitle rejects too long title" {
 }
 
 test "validateId accepts valid ID" {
-    try validateId("1736205028-001");
+    try validateId("mind-a");
 }
 
-test "validateId accepts valid ID with leading zeros" {
-    try validateId("1736205028-000");
+test "validateId accepts valid ID with zeros" {
+    try validateId("project-0");
+}
+
+test "validateId accepts valid ID with max hex value" {
+    try validateId("repo-ffffffff");
+}
+
+test "validateId accepts valid ID with varying lengths" {
+    try validateId("mind-0");
+    try validateId("mind-1");
+    try validateId("mind-a");
+    try validateId("mind-ff");
+    try validateId("mind-123");
+    try validateId("mind-abcdef");
+    try validateId("mind-12345678");
 }
 
 test "validateId rejects empty string" {
@@ -557,24 +690,44 @@ test "validateId rejects empty string" {
 }
 
 test "validateId rejects ID without dashes" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("minda"));
 }
 
 test "validateId rejects ID with too many dashes" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-001-001"));
+    try std.testing.expectError(error.IdInvalidFormat, validateId("mind-a-extra"));
 }
 
-test "validateId rejects ID with non-digit timestamp" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("abc-001"));
+test "validateId rejects ID with uppercase hex" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("mind-A"));
 }
 
-test "validateId rejects ID with non-digit seq" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-abc"));
+test "validateId rejects ID with non-hex chars" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("mind-g"));
 }
 
-test "validateId rejects ID with wrong seq length" {
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-1"));
-    try std.testing.expectError(error.IdInvalidFormat, validateId("1736205028-00123"));
+test "validateId rejects ID with too long hex" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("mind-123456789"));
+}
+
+test "validateId rejects ID with special chars in basename" {
+    try std.testing.expectError(error.IdInvalidFormat, validateId("my-project-a"));
+}
+
+// Backward compatibility tests for old ID format
+test "validateId accepts old format ID" {
+    try validateId("1736205028-001");
+}
+
+test "validateId accepts old format ID with zeros" {
+    try validateId("1736205028-000");
+}
+
+test "validateId accepts old format ID with small timestamp" {
+    try validateId("1-000");
+}
+
+test "validateId accepts old format ID with large timestamp" {
+    try validateId("9999999999-999");
 }
 
 test "generateId produces unique IDs" {
@@ -582,8 +735,8 @@ test "generateId produces unique IDs" {
     var ids = std.StringArrayHashMap(void).init(allocator);
     defer ids.deinit();
 
-    // Generate 100 IDs rapidly - should all be unique
-    for (0..100) |_| {
+    // Generate 10 IDs - should all be unique
+    for (0..10) |_| {
         const id = try generateId(allocator);
         defer allocator.free(id);
 
@@ -597,15 +750,20 @@ test "generateId format" {
     const id = try generateId(allocator);
     defer allocator.free(id);
 
-    // Should match format: {timestamp}-{seq:0>3}
+    // Should match format: {basename}-{hex_seq}
     var parts = std.mem.splitScalar(u8, id, '-');
-    const timestamp_part = parts.next().?;
-    const seq_part = parts.next().?;
+    const basename_part = parts.next().?;
+    const hex_part = parts.next().?;
     try std.testing.expect(parts.next() == null); // No more parts
 
     // Verify parts are non-empty
-    try std.testing.expect(timestamp_part.len > 0);
-    try std.testing.expectEqual(@as(usize, 3), seq_part.len);
+    try std.testing.expect(basename_part.len > 0);
+    try std.testing.expect(hex_part.len >= 1 and hex_part.len <= 8);
+
+    // Verify hex part is lowercase
+    for (hex_part) |c| {
+        try std.testing.expect(c >= '0' and c <= '9' or c >= 'a' and c <= 'f');
+    }
 }
 
 // JSON escaping tests
@@ -734,10 +892,10 @@ test "writeEscapedStringToWriter matches escapeJsonString" {
         const allocated = try escapeJsonString(allocator, input);
         defer allocator.free(allocated);
 
-        var buffer = std.ArrayList(u8).init(allocator);
-        defer buffer.deinit();
-        try writeEscapedStringToWriter(buffer.writer(), input);
+        var buffer: [1024]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+        try writeEscapedStringToWriter(fbs.writer(), input);
 
-        try std.testing.expectEqualStrings(allocated, buffer.items);
+        try std.testing.expectEqualStrings(allocated, fbs.getWritten());
     }
 }

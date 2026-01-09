@@ -148,19 +148,19 @@ const HELP_TEXT =
     \\
     \\EXAMPLES:
     \\    mind add "Implement auth" --body "Add JWT authentication" --tags "feature,security"
-    \\    mind edit 1234567890-001 --title "Fix auth implementation"
-    \\    mind edit 1234567890-001 --status in-progress
+    \\    mind edit mind-a --title "Fix auth implementation"
+    \\    mind edit mind-a --status in-progress
     \\    mind list --status pending
     \\    mind list --tag feature
     \\    mind search "auth"
     \\    mind search --tag frontend "auth"
-    \\    mind show 1234567890-001
+    \\    mind show mind-a
     \\    mind status
-    \\    mind done 1234567890-001 --reason "Completed API integration"
-    \\    mind done 1234567890-001 1234567890-002 1234567890-003
+    \\    mind done mind-a --reason "Completed API integration"
+    \\    mind done mind-a mind-b mind-c
     \\    mind next
     \\    mind next --all
-    \\    mind link 1234567890-002 1234567890-001
+    \\    mind link mind-b mind-a
     \\    mind archive
     \\    mind archive --days 60
     \\    mind list --json

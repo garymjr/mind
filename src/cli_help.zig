@@ -47,16 +47,16 @@ const HELP_TEXT: []const u8 =
     \\
     \\EXAMPLES:
     \\    mind add "Implement auth" --body "Add JWT authentication" --tags "feature,security"
-    \\    mind edit 1234567890-001 --title "Fix auth implementation"
-    \\    mind edit 1234567890-001 --status in-progress
+    \\    mind edit mind-0000000a --title "Fix auth implementation"
+    \\    mind edit mind-0000000a --status in-progress
     \\    mind list --status pending
     \\    mind list --tag feature
-    \\    mind show 1234567890-001
+    \\    mind show mind-0000000a
     \\    mind status
-    \\    mind done 1234567890-001 --reason "Completed API integration"
+    \\    mind done mind-0000000a --reason "Completed API integration"
     \\    mind next
     \\    mind next --all
-    \\    mind link 1234567890-002 1234567890-001
+    \\    mind link mind-0000000b mind-0000000a
     \\    mind archive
     \\    mind archive --days 60
     \\    mind list --json
@@ -94,7 +94,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind add "Fix login bug"
                 \\    mind add "Write docs" --body "Document the API endpoints" --tags "docs,urgent"
                 \\    mind add "Critical issue" --priority critical
-                \\    mind add "Quick task" --quiet  # Output only: 1736205028-001
+                \\    mind add "Quick task" --quiet  # Output only: mind-a
                 \\
                 \\
             );
@@ -117,11 +117,11 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\At least one field must be specified.
                 \\
                 \\EXAMPLES:
-                \\    mind edit 1736205028-001 --title "Updated title"
-                \\    mind update 1736205028-001 --status in-progress
-                \\    mind edit 1736205028-001 --body "More details"
-                \\    mind edit 1736205028-001 --priority high
-                \\    mind update 1736205028-001 --tags "bug,urgent"
+                \\    mind edit mind-a --title "Updated title"
+                \\    mind update mind-a --status in-progress
+                \\    mind edit mind-a --body "More details"
+                \\    mind edit mind-a --priority high
+                \\    mind update mind-a --tags "bug,urgent"
                 \\
                 \\
             );
@@ -163,7 +163,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    --json             Output as JSON
                 \\
                 \\EXAMPLES:
-                \\    mind show 1736205028-001
+                \\    mind show mind-a
                 \\
                 \\
             );
@@ -201,10 +201,10 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\NOTE: Cannot mark blocked todos as done
                 \\
                 \\EXAMPLES:
-                \\    mind done 1736205028-001
-                \\    mind done 1736205028-001 --reason "Fixed the memory leak"
-                \\    mind done 1736205028-001 1736205028-002 1736205028-003
-                \\    mind done 1736205028-001 --json
+                \\    mind done mind-a
+                \\    mind done mind-a --reason "Fixed the memory leak"
+                \\    mind done mind-a mind-b mind-c
+                \\    mind done mind-a --json
                 \\
                 \\
             );
@@ -268,9 +268,9 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\and asked to confirm (unless --yes is also specified).
                 \\
                 \\EXAMPLES:
-                \\    mind delete 1736205028-001
-                \\    mind remove 1736205028-001 --force
-                \\    mind delete 1736205028-001 --force --yes  # skip confirmation
+                \\    mind delete mind-a
+                \\    mind remove mind-a --force
+                \\    mind delete mind-a --force --yes  # skip confirmation
                 \\
                 \\
             );
@@ -288,8 +288,8 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\A todo can depend on multiple parents.
                 \\
                 \\EXAMPLES:
-                \\    mind link 1736205028-002 1736205028-001
-                \\    # Todo 002 now depends on 001
+                \\    mind link mind-b mind-a
+                \\    # Todo b now depends on a
                 \\
                 \\
             );
@@ -305,8 +305,8 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    --from <parent-id>  Parent todo to unlink from
                 \\
                 \\EXAMPLES:
-                \\    mind unlink 1736205028-002 --from 1736205028-001
-                \\    # Todo 002 no longer depends on 001
+                \\    mind unlink mind-b --from mind-a
+                \\    # Todo b no longer depends on a
                 \\
                 \\
             );
@@ -322,8 +322,8 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\storage and filtering regardless of input representation.
                 \\
                 \\EXAMPLES:
-                \\    mind tag 1736205028-001 urgent
-                \\    mind tag 1736205028-001 frontend
+                \\    mind tag mind-a urgent
+                \\    mind tag mind-a frontend
                 \\
                 \\
             );
@@ -336,7 +336,7 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\    mind untag <id> <tag>
                 \\
                 \\EXAMPLES:
-                \\    mind untag 1736205028-001 urgent
+                \\    mind untag mind-a urgent
                 \\
                 \\
             );
