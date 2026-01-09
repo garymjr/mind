@@ -20,7 +20,7 @@ const HELP_TEXT: []const u8 =
     \\    tag <id> <tag>           Add tag to todo
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
-    \\    unlink <id> --from <id>  Remove dependency link
+    \\    unlink <child> <parent>  Remove dependency link
     \\    delete <id>              Delete a todo
     \\    archive                  Archive old done tasks
     \\    help [command]           Show help for command
@@ -56,7 +56,8 @@ const HELP_TEXT: []const u8 =
     \\    mind done mind-0000000a --reason "Completed API integration"
     \\    mind next
     \\    mind next --all
-    \\    mind link mind-0000000b mind-0000000a
+    \\    mind link mind-b mind-a
+    \\    mind unlink mind-b mind-a
     \\    mind archive
     \\    mind archive --days 60
     \\    mind list --json
@@ -299,13 +300,10 @@ pub fn printCommandHelp(writer: *std.fs.File.Writer, command: @import("cli.zig")
                 \\Remove dependency link between todos
                 \\
                 \\USAGE:
-                \\    mind unlink <child-id> --from <parent-id>
-                \\
-                \\FLAGS:
-                \\    --from <parent-id>  Parent todo to unlink from
+                \\    mind unlink <child-id> <parent-id>
                 \\
                 \\EXAMPLES:
-                \\    mind unlink mind-b --from mind-a
+                \\    mind unlink mind-b mind-a
                 \\    # Todo b no longer depends on a
                 \\
                 \\

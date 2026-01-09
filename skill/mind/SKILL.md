@@ -129,6 +129,13 @@ mind add "Child task"
 mind link <child-id> <parent-id>
 ```
 
+### Removing Dependencies
+
+```bash
+# Remove a dependency link
+mind unlink <child-id> <parent-id>
+```
+
 ### Dependency Relationships
 
 - `depends_on`: Tasks this depends on (parents)

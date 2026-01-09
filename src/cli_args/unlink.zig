@@ -6,7 +6,6 @@ pub const Args = struct {
 };
 
 const FLAGS = struct {
-    const FROM = "--from";
     const HELP = "--help";
     const SHORT_HELP = "-h";
 };
@@ -28,16 +27,7 @@ pub fn parse(args: []const []const u8) !Args {
             return error.ShowHelp;
         }
 
-        if (std.mem.eql(u8, arg, FLAGS.FROM)) {
-            i += 1;
-            if (i >= args.len) return error.MissingValueForFlag;
-            result.parent_id = args[i];
-            parent_set = true;
-            i += 1;
-            continue;
-        }
-
-        // Not a flag, must be positional (child_id)
+        // Not a flag, must be positional arguments
         if (isFlag(arg)) {
             return error.UnknownFlag;
         }
@@ -45,10 +35,13 @@ pub fn parse(args: []const []const u8) !Args {
         if (!child_set) {
             result.child_id = arg;
             child_set = true;
-            i += 1;
+        } else if (!parent_set) {
+            result.parent_id = arg;
+            parent_set = true;
         } else {
             return error.UnexpectedPositional;
         }
+        i += 1;
     }
 
     if (!child_set) return error.MissingChildId;

@@ -137,7 +137,7 @@ const HELP_TEXT =
     \\    tag <id> <tag>           Add tag to todo
     \\    untag <id> <tag>         Remove tag from todo
     \\    link <child> <parent>    Link todos (parent blocks child)
-    \\    unlink <id> --from <id>  Remove dependency link
+    \\    unlink <child> <parent>  Remove dependency link
     \\    delete <id>              Delete a todo
     \\    remove <id>              Alias for delete
     \\    archive                  Archive old done tasks
@@ -161,6 +161,7 @@ const HELP_TEXT =
     \\    mind next
     \\    mind next --all
     \\    mind link mind-b mind-a
+    \\    mind unlink mind-b mind-a
     \\    mind archive
     \\    mind archive --days 60
     \\    mind list --json
